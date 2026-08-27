@@ -10,7 +10,7 @@ import { makeCompiler } from "./compile.ts";
 import { answer } from "./answer.ts";
 import { CLIENTS, clientById } from "./corpus/roster.ts";
 import { refKey, TASK_KINDS } from "./types.ts";
-import type { Manifest, TaskKind } from "./types.ts";
+import type { Manifest, ManifestEntry, TaskKind } from "./types.ts";
 import type { FencePolicy } from "./fence.ts";
 import { routeFor } from "./route.ts";
 
@@ -83,7 +83,8 @@ function printManifest(manifest: Manifest): void {
   }
 
   const crossClient = manifest.entries.filter(
-    (e) => !e.admitted && (e.reason === "cross-client" || e.reason === "not-authorized"),
+    (e): e is Extract<ManifestEntry, { admitted: false }> =>
+      !e.admitted && (e.reason === "cross-client" || e.reason === "not-authorized"),
   );
   if (crossClient.length > 0) {
     process.stdout.write("\nheld back by the fence\n");
