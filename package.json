@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "ccc": "node --experimental-strip-types src/cli.ts",
-    "evals": "node --experimental-strip-types evals/run.ts"
+    "evals": "node --experimental-strip-types evals/run.ts",
+    "measure": "node --experimental-strip-types evals/measure.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0"
