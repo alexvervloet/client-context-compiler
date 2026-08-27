@@ -1,0 +1,24 @@
+{
+  "name": "client-context-compiler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Compiles a wealth-management agent's context window from CRM, email, and calendar records, one client at a time.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "ccc": "node --experimental-strip-types src/cli.ts",
+    "evals": "node --experimental-strip-types evals/run.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}
