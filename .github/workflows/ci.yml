@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # Pinned to the runtime the scripts are written for: type stripping
+          # is behind a flag on 22 and on by default from 23.6. Both work, but
+          # pinning keeps a CI failure from being about the Node version.
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: unit tests
+        run: npm test
+
+      # The gate. No API key, so the quality suites report as skipped and the
+      # leak, trap, authorization and budget suites decide the build.
+      - name: evals
+        run: npm run evals
