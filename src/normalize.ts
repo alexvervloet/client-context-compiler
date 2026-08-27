@@ -22,26 +22,50 @@ import type { MentionIndex } from "./mentions.ts";
 import { buildMentionIndex } from "./mentions.ts";
 import { estimateTokens } from "./tokens.ts";
 
-/** Paragraphs longer than this get their own chunk; shorter ones merge. */
+/** Paragraphs shorter than this are runts and want to merge forward. */
 const MIN_PARAGRAPH_CHARS = 120;
 
-function splitParagraphs(body: string): string[] {
+/** Clients a passage names unambiguously. Ambiguous forms do not count. */
+function resolvedClients(text: string, index: MentionIndex): Set<string> {
+  const found = new Set<string>();
+  for (const mention of findMentions(text, index)) {
+    const only = mention.candidates.length === 1 ? mention.candidates[0] : undefined;
+    if (only !== undefined) found.add(only);
+  }
+  return found;
+}
+
+/**
+ * Split a document body into chunk-sized passages.
+ *
+ * Merging a runt paragraph into its neighbour looks like formatting and is
+ * not. The trust document has a two-line paragraph about one sibling followed
+ * by one about another; merged, the result names two clients and is admissible
+ * for neither. So a merge is refused whenever it would put a second named
+ * client into a passage.
+ */
+function splitParagraphs(body: string, index: MentionIndex): string[] {
   const raw = body
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter((p) => p !== "");
   if (raw.length <= 1) return raw;
 
-  // Merge runt paragraphs forward so a one-line heading does not become a
-  // chunk of its own with no context and no mentions.
   const merged: string[] = [];
   for (const paragraph of raw) {
     const previous = merged[merged.length - 1];
-    if (previous !== undefined && previous.length < MIN_PARAGRAPH_CHARS) {
-      merged[merged.length - 1] = `${previous}\n${paragraph}`;
-    } else {
-      merged.push(paragraph);
+    const isRunt = previous !== undefined && previous.length < MIN_PARAGRAPH_CHARS;
+    if (previous !== undefined && isRunt) {
+      const combined = new Set([
+        ...resolvedClients(previous, index),
+        ...resolvedClients(paragraph, index),
+      ]);
+      if (combined.size <= 1) {
+        merged[merged.length - 1] = `${previous}\n${paragraph}`;
+        continue;
+      }
     }
+    merged.push(paragraph);
   }
   return merged;
 }
@@ -159,7 +183,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
   }
 
   for (const note of corpus.notes) {
-    const paragraphs = splitParagraphs(note.body);
+    const paragraphs = splitParagraphs(note.body, index);
     paragraphs.forEach((paragraph, i) => {
       const text = `Meeting note — ${note.title} (${note.date})\n\n${paragraph}`;
       chunks.push(
@@ -182,7 +206,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
   }
 
   for (const plan of corpus.plans) {
-    const paragraphs = splitParagraphs(plan.body);
+    const paragraphs = splitParagraphs(plan.body, index);
     paragraphs.forEach((paragraph, i) => {
       const text = `Planning document — ${plan.title} (updated ${plan.updated})\n\n${paragraph}`;
       chunks.push(
@@ -205,7 +229,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
   }
 
   for (const doc of corpus.firmDocs) {
-    const paragraphs = splitParagraphs(doc.body);
+    const paragraphs = splitParagraphs(doc.body, index);
     paragraphs.forEach((paragraph, i) => {
       const text = `Firm document — ${doc.title}\n\n${paragraph}`;
       chunks.push(
