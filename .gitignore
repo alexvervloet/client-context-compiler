@@ -3,5 +3,5 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .env
-corpus/
+/out/corpus/
 out/
