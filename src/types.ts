@@ -43,6 +43,25 @@ export type MemoryLayer = "firm" | "client" | "conversation";
 
 export const MEMORY_LAYERS: readonly MemoryLayer[] = ["firm", "client", "conversation"];
 
+/**
+ * One place in a chunk where a client is named, and who it could be.
+ *
+ * The candidate list is what separates two very different problems. A mention
+ * with one candidate that is not the subject is contamination. A mention with
+ * several candidates, one of which is the subject, is an under-specified
+ * reference to the subject: "Okonkwo" inside Adaeze's own briefing almost
+ * certainly means Adaeze, and dropping the chunk over it throws away good
+ * material. A mention whose candidates exclude the subject entirely is
+ * contamination again, however many candidates it has.
+ */
+export type Mention = {
+  /** The literal text that matched. */
+  form: string;
+  start: number;
+  end: number;
+  candidates: ClientId[];
+};
+
 export type Chunk = {
   id: string;
   layer: MemoryLayer;
@@ -56,6 +75,8 @@ export type Chunk = {
    * what to do with it.
    */
   clients: ClientId[];
+  /** Where each client is named, for the fence to reason over. */
+  mentions: Mention[];
   /** Estimated tokens. See tokens.ts for what "estimated" is worth here. */
   tokens: number;
 };
