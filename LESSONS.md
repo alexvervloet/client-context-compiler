@@ -43,3 +43,64 @@ client boundaries decide whether it is *allowed*.
 other text is a boundary decision. Splitting, merging, windowing, overlap,
 summarising several records into one. Ask what a chunk is admissible for before
 tuning it for retrieval quality.
+
+## The fence had the exact bug the project was built to catch
+
+**Expected:** treating an ambiguous name as harmless when the subject is one of
+the candidates. "Okonkwo" inside Adaeze's window means Adaeze, so admit it and
+move on. That reasoning is fine and I still think it is right.
+
+**What happened:** the generated meeting notes are titled `{surname} — meeting
+notes`. For three siblings, that title names all three and nobody in
+particular. A note whose only client signal is that title is therefore
+"ambiguous, includes the subject" for every sibling, so the fence admitted
+Chidi's notes into Adaeze's window, Adaeze's into Chidi's, and both into each
+other's for every task. Same for the two Chens, same for the two Delgados.
+
+The eval suite caught it on the first run. Nothing else would have: no name
+appeared that shouldn't, so a name-based check passed. What leaked was the
+*body* of someone else's note under a title that could have meant anyone. The
+only reason it surfaced is that the suite checks for private details, not just
+for names, and those details were planted for that purpose.
+
+The root cause was upstream. Normalization computed which clients a chunk was
+about purely from its rendered text, and threw away the source record's own
+fields. A meeting note has an attendee list. An email has a From header. Those
+answer "whose file is this" when the prose refuses to.
+
+The rule now: an unambiguous name in the text is the anchor when there is one,
+and the record's own metadata is the anchor when there is not. An ambiguous
+name is harmless only when something else already pins the passage to the
+subject.
+
+**Next time:** an invariant enforced only over rendered text can only see what
+the text says. Provenance is a separate signal and it has to be carried, not
+re-derived. And write the eval that looks for the *content* that must not
+travel, not only the names.
+
+## Redaction does not contain a shared record, and the numbers said so
+
+**Expected:** a `redact` policy that masks another client's name would let
+shared records into the window safely, trading a little precision for a lot of
+recall. Strict would drop the whole Harbor Point thread; redact would keep it
+with the other man's name blanked.
+
+**What happened:** it leaked in eight of forty-eight cases. Masking
+`james.osei@example.test` out of a message *written by* Osei leaves the
+sentence "my daughter's tuition is due September 12" sitting in Whitfield's
+window attributed to `[another client]`. The name is gone. The fact is not, and
+a model reading a window compiled for one man has every reason to treat an
+ownerless fact in it as his.
+
+Sentence-level masking would not have helped either: the giveaway was in the
+`From` header, not in the sentence.
+
+Redaction now only applies to a client mentioned *in passing* in a record
+somebody else owns. If the other client is party to the record, it is refused
+under both policies. That is a smaller feature than intended and it is the only
+version of it that holds.
+
+**Next time:** "remove the identifier" is not the same as "remove the
+information", and for anything authored by the person being protected it is not
+close. Measure the containment claim before shipping the policy that depends on
+it.
