@@ -1,0 +1,115 @@
+/**
+ * Retrieval, with the client filter applied before scoring rather than after.
+ *
+ * Filtering after ranking is the common shape and it is wrong in two ways.
+ * It leaks through top-k: ask for twenty candidates, discard eleven that
+ * belong to other clients, and the window is built from nine. And it means a
+ * forbidden chunk was ranked, logged, and traced before anyone checked whether
+ * it was allowed to exist in that request. Chunks that cannot serve the
+ * subject never enter the comparison here.
+ *
+ * Recency is blended into the score rather than used as a tiebreak, because
+ * the stale-note trap is not a tie. A 2024 note saying a client is aggressive
+ * and a 2026 note saying she is conservative are both an excellent lexical
+ * match for "risk tolerance", and the wrong one wins on similarity alone.
+ */
+
+import type { Chunk, ClientId } from "./types.ts";
+import { cosine } from "./embed.ts";
+import type { Embedder } from "./embed.ts";
+
+const EMBED_BATCH = 96;
+
+export type SearchIndex = {
+  chunks: Chunk[];
+  vectors: Float32Array[];
+  embedder: Embedder;
+};
+
+export async function buildIndex(chunks: Chunk[], embedder: Embedder): Promise<SearchIndex> {
+  const vectors: Float32Array[] = [];
+  for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
+    const batch = chunks.slice(i, i + EMBED_BATCH);
+    vectors.push(...(await embedder.embed(batch.map((c) => c.text))));
+  }
+  return { chunks, vectors, embedder };
+}
+
+export type Candidate = {
+  chunk: Chunk;
+  similarity: number;
+  /** 1 for something written today, decaying with age. */
+  recency: number;
+  score: number;
+};
+
+export type SearchOptions = {
+  query: string;
+  subject: ClientId;
+  /** ISO. Fixed clock so a search is reproducible. */
+  now: string;
+  topK?: number;
+  /** How much of the score is recency rather than similarity. */
+  recencyWeight?: number;
+  /** Age at which a record has half the recency score of a new one. */
+  halfLifeDays?: number;
+  /** Candidates below this similarity are not worth a place in the window. */
+  minSimilarity?: number;
+};
+
+const DEFAULTS = {
+  topK: 40,
+  recencyWeight: 0.35,
+  halfLifeDays: 180,
+  minSimilarity: 0.02,
+};
+
+export async function search(
+  index: SearchIndex,
+  options: SearchOptions,
+): Promise<Candidate[]> {
+  const topK = options.topK ?? DEFAULTS.topK;
+  const recencyWeight = options.recencyWeight ?? DEFAULTS.recencyWeight;
+  const halfLifeDays = options.halfLifeDays ?? DEFAULTS.halfLifeDays;
+  const minSimilarity = options.minSimilarity ?? DEFAULTS.minSimilarity;
+
+  const [queryVector] = await index.embedder.embed([options.query]);
+  if (queryVector === undefined) throw new Error("embedder returned no query vector");
+
+  const nowMs = Date.parse(options.now);
+  const candidates: Candidate[] = [];
+
+  for (let i = 0; i < index.chunks.length; i++) {
+    const chunk = index.chunks[i];
+    const vector = index.vectors[i];
+    if (chunk === undefined || vector === undefined) continue;
+
+    // The filter, before the comparison.
+    if (!servesSubject(chunk, options.subject)) continue;
+
+    const similarity = cosine(queryVector, vector);
+    if (similarity < minSimilarity) continue;
+
+    const ageDays = Math.max(0, (nowMs - Date.parse(chunk.timestamp)) / 86_400_000);
+    const recency = Math.pow(0.5, ageDays / halfLifeDays);
+    candidates.push({
+      chunk,
+      similarity,
+      recency,
+      score: similarity * (1 - recencyWeight) + recency * recencyWeight,
+    });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.slice(0, topK);
+}
+
+/**
+ * Whether a chunk could serve this client at all. Firm knowledge serves
+ * everyone; client text has to name the subject somewhere. A chunk that names
+ * only other people is not a low-scoring candidate, it is not a candidate.
+ */
+export function servesSubject(chunk: Chunk, subject: ClientId): boolean {
+  if (chunk.layer === "firm" && chunk.clients.length === 0) return true;
+  return chunk.clients.includes(subject);
+}
