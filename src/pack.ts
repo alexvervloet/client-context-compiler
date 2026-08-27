@@ -92,10 +92,15 @@ export function pack(input: PackInput): CompiledContext {
     conversation: conversationCandidates,
   };
 
-  let remaining = request.budgetTokens;
+  // The window's own furniture costs tokens: the header, and a heading for
+  // each layer that ends up with anything in it. Reserve it before handing
+  // shares out, rather than discovering it after the fact.
+  const scaffold = scaffoldTokens(request, clientName);
+  const available = Math.max(0, request.budgetTokens - scaffold);
+  let remaining = available;
 
   for (const layer of FILL_ORDER) {
-    const share = Math.floor(request.budgetTokens * (budgets[layer] ?? 0));
+    const share = Math.floor(available * (budgets[layer] ?? 0));
     // The last layer gets everything left, not just its nominal share.
     const allowance = layer === "client" ? remaining : Math.min(share, remaining);
     let spent = 0;
@@ -133,31 +138,31 @@ export function pack(input: PackInput): CompiledContext {
         continue;
       }
 
-      // Redaction changes the text, so it changes the cost.
-      const tokens = verdict.action === "redact" ? estimateTokens(text) : chunk.tokens;
-      const withCitation = tokens + estimateTokens(`[${refKey(chunk.ref)}]`);
+      const ambiguousForms = [...new Set(verdict.ambiguous.map((m) => m.form))];
+      const record: Admitted = { chunk, text, score: candidate.score, ambiguousForms };
+      if (verdict.action === "redact") record.redactedClients = verdict.masked;
 
-      if (spent + withCitation > allowance) {
+      // Cost what will actually be rendered, citation line and blank lines
+      // included. Costing the bare chunk and rendering something larger is how
+      // a window overflows a budget it was told to respect.
+      const cost = estimateTokens(renderRecord(record));
+
+      if (spent + cost > allowance) {
         entries.push({
           admitted: false,
           chunkId: chunk.id,
           ref: chunk.ref,
           layer,
-          tokens,
+          tokens: cost,
           score: candidate.score,
           reason: spent === 0 ? "over-budget" : "layer-quota",
-          detail: `needed ${withCitation}, ${allowance - spent} left in the ${layer} layer`,
+          detail: `needed ${cost}, ${allowance - spent} left in the ${layer} layer`,
         });
         continue;
       }
 
       seenText.add(fingerprint);
-      spent += withCitation;
-
-      const ambiguousForms = [...new Set(verdict.ambiguous.map((m) => m.form))];
-
-      const record: Admitted = { chunk, text, score: candidate.score, ambiguousForms };
-      if (verdict.action === "redact") record.redactedClients = verdict.masked;
+      spent += cost;
       admitted[layer].push(record);
 
       const entry: ManifestEntry = {
@@ -165,7 +170,7 @@ export function pack(input: PackInput): CompiledContext {
         chunkId: chunk.id,
         ref: chunk.ref,
         layer,
-        tokens: withCitation,
+        tokens: cost,
         score: candidate.score,
       };
       if (verdict.action === "redact") entry.redactedClients = verdict.masked;
@@ -176,10 +181,20 @@ export function pack(input: PackInput): CompiledContext {
   }
 
   const text = render(request, clientName, admitted);
+  const usedTokens = estimateTokens(text);
 
   // The last line of defence. If this throws, the fence has a hole and the
   // right thing to do is fail the request, not ship the window.
   assertSingleClient(text, subject, index);
+
+  // A budget that is advisory is not a budget. If accounting has drifted, say
+  // so here rather than letting the caller find out from a 400 at request time.
+  if (usedTokens > request.budgetTokens) {
+    throw new Error(
+      `packed window is ${usedTokens} tokens against a budget of ${request.budgetTokens}. ` +
+        "Costing and rendering have drifted apart.",
+    );
+  }
 
   const layers: Record<MemoryLayer, LayerStat> = {
     firm: layerStat(entries, "firm"),
@@ -198,7 +213,7 @@ export function pack(input: PackInput): CompiledContext {
     manifest: {
       request,
       budgetTokens: request.budgetTokens,
-      usedTokens: estimateTokens(text),
+      usedTokens,
       candidateCount: entries.length,
       entries,
       layers,
@@ -228,37 +243,52 @@ const LAYER_HEADINGS: Record<MemoryLayer, string> = {
   conversation: "This conversation",
 };
 
-function render(
-  request: CompileRequest,
-  clientName: string,
-  admitted: Record<MemoryLayer, Admitted[]>,
-): string {
-  const parts: string[] = [
+function windowHeader(request: CompileRequest, clientName: string): string {
+  return [
     `# Context for ${clientName} — ${request.task}`,
     "",
     `Compiled ${request.now}. Every passage below carries a citation key in`,
     "square brackets. Cite the key for any claim you make. If nothing here",
     "supports a claim, say so instead of making it.",
-  ];
+  ].join("\n");
+}
 
+/**
+ * One passage as it appears in the window. Every piece starts with whitespace,
+ * which is what makes the token estimate additive: costing the parts and
+ * counting the whole give the same answer.
+ */
+function renderRecord(record: Admitted): string {
+  const notes: string[] = [];
+  if (record.redactedClients !== undefined && record.redactedClients.length > 0) {
+    notes.push("another client's name has been masked");
+  }
+  if (record.ambiguousForms.length > 0) {
+    notes.push(`ambiguous reference: ${record.ambiguousForms.map((f) => `"${f}"`).join(", ")}`);
+  }
+  const suffix = notes.length > 0 ? ` (${notes.join("; ")})` : "";
+  return `\n\n[${refKey(record.chunk.ref)}]${suffix}\n${record.text}`;
+}
+
+function scaffoldTokens(request: CompileRequest, clientName: string): number {
+  let total = estimateTokens(windowHeader(request, clientName));
+  for (const layer of MEMORY_LAYERS) {
+    total += estimateTokens(`\n\n## ${LAYER_HEADINGS[layer]}`);
+  }
+  return total;
+}
+
+function render(
+  request: CompileRequest,
+  clientName: string,
+  admitted: Record<MemoryLayer, Admitted[]>,
+): string {
+  let out = windowHeader(request, clientName);
   for (const layer of MEMORY_LAYERS) {
     const records = admitted[layer];
     if (records.length === 0) continue;
-    parts.push("", `## ${LAYER_HEADINGS[layer]}`);
-    for (const record of records) {
-      const notes: string[] = [];
-      if (record.redactedClients !== undefined && record.redactedClients.length > 0) {
-        notes.push("another client's name has been masked");
-      }
-      if (record.ambiguousForms.length > 0) {
-        notes.push(
-          `ambiguous reference: ${record.ambiguousForms.map((f) => `"${f}"`).join(", ")}`,
-        );
-      }
-      const suffix = notes.length > 0 ? ` (${notes.join("; ")})` : "";
-      parts.push("", `[${refKey(record.chunk.ref)}]${suffix}`, record.text);
-    }
+    out += `\n\n## ${LAYER_HEADINGS[layer]}`;
+    for (const record of records) out += renderRecord(record);
   }
-
-  return parts.join("\n");
+  return out;
 }
