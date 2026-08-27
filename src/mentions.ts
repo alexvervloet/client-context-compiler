@@ -13,7 +13,7 @@
  * asserting one spouse's holdings as the other's.
  */
 
-import type { ClientId } from "./types.ts";
+import type { ClientId, Mention } from "./types.ts";
 import { CLIENTS } from "./corpus/roster.ts";
 import type { ClientSeed } from "./corpus/roster.ts";
 
@@ -65,10 +65,13 @@ function escapeRegExp(value: string): string {
  * "Margaret Chen" resolves to Margaret alone while a bare "Chen" stays
  * ambiguous and resolves to both.
  */
-export function detectMentions(text: string, index: MentionIndex): ClientId[] {
+export function findMentions(text: string, index: MentionIndex): Mention[] {
   const lower = text.toLowerCase();
+  const mentions: Mention[] = [];
   const claimed: Array<[number, number]> = [];
-  const found = new Set<ClientId>();
+
+  const overlaps = (start: number, end: number): boolean =>
+    claimed.some(([s, e]) => start < e && end > s);
 
   // Email addresses first, and they keep their characters. An address
   // contains a surname, so letting a name rule match inside one turns
@@ -76,9 +79,10 @@ export function detectMentions(text: string, index: MentionIndex): ClientId[] {
   for (const [email, client] of index.byEmail) {
     let at = lower.indexOf(email);
     while (at !== -1) {
-      claimed.push([at, at + email.length]);
-      found.add(client);
-      at = lower.indexOf(email, at + email.length);
+      const end = at + email.length;
+      claimed.push([at, end]);
+      mentions.push({ form: text.slice(at, end), start: at, end, candidates: [client] });
+      at = lower.indexOf(email, end);
     }
   }
 
@@ -88,13 +92,26 @@ export function detectMentions(text: string, index: MentionIndex): ClientId[] {
     while ((match = pattern.exec(text)) !== null) {
       const start = match.index;
       const end = start + match[0].length;
-      if (claimed.some(([s, e]) => start < e && end > s)) continue;
+      if (overlaps(start, end)) continue;
       claimed.push([start, end]);
-      for (const client of clients) found.add(client);
+      mentions.push({ form: match[0], start, end, candidates: [...clients] });
     }
   }
 
+  return mentions.sort((a, b) => a.start - b.start);
+}
+
+/** Every client any mention could refer to. The coarse view. */
+export function mentionedClients(mentions: readonly Mention[]): ClientId[] {
+  const found = new Set<ClientId>();
+  for (const mention of mentions) {
+    for (const candidate of mention.candidates) found.add(candidate);
+  }
   return [...found].sort();
+}
+
+export function detectMentions(text: string, index: MentionIndex): ClientId[] {
+  return mentionedClients(findMentions(text, index));
 }
 
 /** Map email addresses from a header or attendee list onto client ids. */
