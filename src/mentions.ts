@@ -66,8 +66,21 @@ function escapeRegExp(value: string): string {
  * ambiguous and resolves to both.
  */
 export function detectMentions(text: string, index: MentionIndex): ClientId[] {
+  const lower = text.toLowerCase();
   const claimed: Array<[number, number]> = [];
   const found = new Set<ClientId>();
+
+  // Email addresses first, and they keep their characters. An address
+  // contains a surname, so letting a name rule match inside one turns
+  // ngozi.okonkwo@example.test into a mention of all three Okonkwos.
+  for (const [email, client] of index.byEmail) {
+    let at = lower.indexOf(email);
+    while (at !== -1) {
+      claimed.push([at, at + email.length]);
+      found.add(client);
+      at = lower.indexOf(email, at + email.length);
+    }
+  }
 
   for (const { pattern, clients } of index.forms) {
     pattern.lastIndex = 0;
@@ -79,10 +92,6 @@ export function detectMentions(text: string, index: MentionIndex): ClientId[] {
       claimed.push([start, end]);
       for (const client of clients) found.add(client);
     }
-  }
-
-  for (const [email, client] of index.byEmail) {
-    if (text.toLowerCase().includes(email)) found.add(client);
   }
 
   return [...found].sort();
