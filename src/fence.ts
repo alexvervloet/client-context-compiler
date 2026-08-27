@@ -16,8 +16,16 @@
  *             the leak, or the advisor is not authorized for a client it names.
  *
  * A mention whose candidates include the subject is under-specification, not
- * contamination. "Okonkwo" in Adaeze's own window means Adaeze. Treating that
- * as a leak throws away most of a family's records for nothing.
+ * contamination, but only when something else anchors the chunk to the
+ * subject. "Okonkwo" inside a passage that also says "Adaeze Okonkwo" means
+ * Adaeze. "Okonkwo" in a passage that names nobody else means any of three
+ * siblings, and admitting it is how one sibling's meeting notes end up filed
+ * under another's.
+ *
+ * Anchoring has a precedence: an unambiguous name in the text wins, and the
+ * source record's own fields are the fallback. A meeting note headed
+ * "Okonkwo — meeting notes" names nobody; its attendee list names exactly one
+ * person, and that is whose note it is.
  */
 
 import type { Chunk, ClientId, Mention } from "./types.ts";
@@ -37,6 +45,8 @@ export type RefuseReason =
   | "shared-record"
   /** Masking ran and a contaminating mention survived it. */
   | "redaction-incomplete"
+  /** Nothing ties the passage to the subject rather than to a namesake. */
+  | "unanchored"
   /** The passage names a client this advisor may not see at all. */
   | "not-authorized";
 
@@ -102,23 +112,61 @@ export function fence(chunk: Chunk, options: FenceOptions): FenceVerdict {
   }
 
   const { contaminating, ambiguous } = classify(chunk.mentions, subject);
-  if (contaminating.length === 0) {
+
+  // Who this passage is about. An unambiguous name in the text is the best
+  // answer; the source record's own fields are the fallback when the prose
+  // does not commit to anyone.
+  const resolved = new Set<ClientId>();
+  for (const mention of chunk.mentions) {
+    const only = mention.candidates.length === 1 ? mention.candidates[0] : undefined;
+    if (only !== undefined) resolved.add(only);
+  }
+  const anchors = resolved.size > 0 ? resolved : new Set(chunk.owners);
+  const foreignAnchors = [...anchors].filter((c) => c !== subject).sort();
+  const anchoredToSubject = anchors.has(subject);
+
+  if (contaminating.length === 0 && foreignAnchors.length === 0) {
+    // An ambiguous name is only harmless when something pins this passage to
+    // the subject. Otherwise the passage belongs to a namesake and we cannot
+    // tell which one.
+    if (ambiguous.length > 0 && !anchoredToSubject) {
+      return {
+        action: "refuse",
+        reason: "unanchored",
+        offending: clientsOf(ambiguous).filter((c) => c !== subject),
+      };
+    }
     return { action: "admit", text: chunk.text, ambiguous };
   }
 
-  const offending = clientsOf(contaminating);
-  const namesSubject = chunk.mentions.some(
-    (m) => m.candidates.length === 1 && m.candidates[0] === subject,
-  );
+  const offending = [...new Set([...clientsOf(contaminating), ...foreignAnchors])].sort();
 
   // Someone else's record entirely. Masking would leave a passage of facts
   // with no owner, sitting in this client's window waiting to be misread.
-  if (!namesSubject) {
+  if (!anchoredToSubject) {
     return { action: "refuse", reason: "other-client-only", offending };
   }
 
   if (policy === "strict") {
     return { action: "refuse", reason: "shared-record", offending };
+  }
+
+  // Masking edits names. It cannot do anything about the facts around them.
+  //
+  // If another client is party to the record itself, the sender of the email
+  // or an attendee of the meeting, then the passage contains their account of
+  // their own affairs and removing their name just leaves those facts sitting
+  // in someone else's window with no owner attached. Measured on this corpus,
+  // masking alone let Osei's tuition obligation through into Whitfield's
+  // window in three tasks out of four. So this case refuses under both
+  // policies, and redaction is left to handle mentions in passing.
+  const foreignOwners = chunk.owners.filter((c) => c !== subject);
+  if (foreignOwners.length > 0) {
+    return {
+      action: "refuse",
+      reason: "shared-record",
+      offending: [...new Set([...offending, ...foreignOwners])].sort(),
+    };
   }
 
   // Mask right to left so earlier offsets stay valid.
