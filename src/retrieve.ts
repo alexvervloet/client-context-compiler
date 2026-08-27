@@ -111,5 +111,7 @@ export async function search(
  */
 export function servesSubject(chunk: Chunk, subject: ClientId): boolean {
   if (chunk.layer === "firm" && chunk.clients.length === 0) return true;
+  // A record owned by somebody else is not a weak candidate, it is not one.
+  if (chunk.owners.length > 0 && !chunk.owners.includes(subject)) return false;
   return chunk.clients.includes(subject);
 }

@@ -17,7 +17,7 @@
 import type { Chunk, MemoryLayer, SourceRef } from "./types.ts";
 import type { Corpus } from "./corpus/shapes.ts";
 import { addresses, header } from "./corpus/shapes.ts";
-import { findMentions, mentionedClients } from "./mentions.ts";
+import { clientsForEmails, findMentions, mentionedClients } from "./mentions.ts";
 import type { MentionIndex } from "./mentions.ts";
 import { buildMentionIndex } from "./mentions.ts";
 import { estimateTokens } from "./tokens.ts";
@@ -77,15 +77,18 @@ function makeChunk(
   ref: SourceRef,
   timestamp: string,
   index: MentionIndex,
+  owners: string[] = [],
 ): Chunk {
   const mentions = findMentions(text, index);
+  const clients = [...new Set([...owners, ...mentionedClients(mentions)])].sort();
   return {
     id,
     layer,
     text,
     ref,
     timestamp,
-    clients: mentionedClients(mentions),
+    clients,
+    owners: [...owners].sort(),
     mentions,
     tokens: estimateTokens(text),
   };
@@ -117,6 +120,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
         },
         contact.updatedAt,
         index,
+        clientsForEmails([p.email], index),
       ),
     );
   }
@@ -148,6 +152,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
           },
           sent,
           index,
+          clientsForEmails([...addresses(from), ...to, ...cc], index),
         ),
       );
     }
@@ -178,6 +183,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
         },
         when,
         index,
+        clientsForEmails(event.attendees.map((a) => a.email), index),
       ),
     );
   }
@@ -200,6 +206,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
           },
           `${note.date}T00:00:00.000Z`,
           index,
+          clientsForEmails(note.attendeeEmails, index),
         ),
       );
     });
@@ -223,6 +230,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
           },
           `${plan.updated}T00:00:00.000Z`,
           index,
+          clientsForEmails(plan.clientEmails, index),
         ),
       );
     });

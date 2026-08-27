@@ -70,11 +70,20 @@ export type Chunk = {
   /** ISO 8601. Firm-layer chunks use the date the policy was published. */
   timestamp: string;
   /**
-   * Every client this text discusses or is addressed to. Empty for firm-layer
-   * text. Two entries means the chunk is shared, and the fence has to decide
-   * what to do with it.
+   * Every client this chunk could concern: structural owners and everyone any
+   * mention could refer to. The coarse view, used for filtering.
    */
   clients: ClientId[];
+  /**
+   * Who the source record belongs to, from its own fields rather than its
+   * prose: the addresses on an email, the attendees on an event, the client
+   * a CRM record is for.
+   *
+   * This is the answer to "whose file is this" when the text itself does not
+   * say. A meeting note titled "Okonkwo — meeting notes" names nobody in
+   * particular; its attendee list does.
+   */
+  owners: ClientId[];
   /** Where each client is named, for the fence to reason over. */
   mentions: Mention[];
   /** Estimated tokens. See tokens.ts for what "estimated" is worth here. */
