@@ -22,3 +22,24 @@ than "contains the client I expected".
 match consume its characters so the looser rule cannot see them. More generally,
 assert the whole set in tests for this kind of extraction. `assert(found
 .includes(x))` would have passed.
+
+## Paragraph merging is a contamination decision wearing a formatting costume
+
+**Expected:** merging short paragraphs into their neighbour was tidying. A
+two-line heading has no business being its own chunk.
+
+**What happened:** in the trust document, the paragraph about one sibling's
+sub-account is 92 characters, so it merged forward into the paragraph about the
+next sibling. The resulting chunk named two clients and was therefore
+admissible for neither. Both siblings lost their own account balance from every
+window, and the manifest said "cross-client", which is true and completely
+unhelpful.
+
+The rule now refuses a merge whenever it would put a second unambiguously named
+client into the passage. Length still decides whether a merge is *wanted*;
+client boundaries decide whether it is *allowed*.
+
+**Next time:** any transformation that changes what text sits next to what
+other text is a boundary decision. Splitting, merging, windowing, overlap,
+summarising several records into one. Ask what a chunk is admissible for before
+tuning it for retrieval quality.
