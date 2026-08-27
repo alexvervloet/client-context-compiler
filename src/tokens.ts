@@ -63,15 +63,15 @@ export async function measureEstimatorError(
   let maxUnder = 0;
   let under = 0;
 
+  const envelope = await measureEnvelopeTokens(model, client);
+
   for (const text of samples) {
     if (text.trim() === "") continue;
     const response = await client.messages.countTokens({
       model,
       messages: [{ role: "user", content: text }],
     });
-    // count_tokens includes a small fixed overhead for the message envelope.
-    // Subtracting it compares like with like.
-    const actual = response.input_tokens - MESSAGE_ENVELOPE_TOKENS;
+    const actual = response.input_tokens - envelope;
     if (actual <= 0) continue;
 
     const relative = (estimateTokens(text) - actual) / actual;
@@ -92,7 +92,20 @@ export async function measureEstimatorError(
 }
 
 /**
- * count_tokens bills a few tokens for the message wrapper regardless of
- * content. Measured, not guessed: countTokens on an empty-ish message.
+ * count_tokens charges for the message wrapper regardless of content, and the
+ * amount is a property of the model's tokenizer rather than a constant we get
+ * to assume. Measure it once per run and subtract it, so the comparison is
+ * estimator against tokenizer and not estimator against tokenizer plus
+ * whatever the envelope happened to cost that month.
  */
-export const MESSAGE_ENVELOPE_TOKENS = 7;
+export async function measureEnvelopeTokens(
+  model = "claude-opus-5",
+  client: Anthropic = new Anthropic(),
+): Promise<number> {
+  const probe = "x";
+  const response = await client.messages.countTokens({
+    model,
+    messages: [{ role: "user", content: probe }],
+  });
+  return Math.max(0, response.input_tokens - estimateTokens(probe));
+}
