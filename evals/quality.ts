@@ -64,7 +64,9 @@ export function attributionBlocks(text: string): string[] {
 
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim();
-    if (line === "" || line.startsWith("#")) {
+    // A line that is nothing but emphasis is a sub-heading written in a
+    // different notation than "#", and a heading asserts nothing.
+    if (line === "" || line.startsWith("#") || BOLD_HEADING.test(line)) {
       flush();
       continue;
     }
@@ -79,6 +81,30 @@ export function attributionBlocks(text: string): string[] {
 }
 
 export const CITATION = /\[[a-z]+:[a-z-]+\//;
+
+/** A line consisting only of bold or italic text, optionally ending in a colon. */
+const BOLD_HEADING = /^(\*{1,3}|_{1,3})[^*_]+\1:?$/;
+
+/**
+ * Blocks that assert something and cite nothing.
+ *
+ * One exception, and it is deliberately narrow. A line ending in a colon that
+ * introduces the block after it is a lead-in, not a claim, but only when that
+ * next block is itself attributed. "Three gates apply before the meeting
+ * ends:" followed by cited gates is structure. The same line followed by
+ * nothing sourced is an assertion wearing a colon, and still fails.
+ */
+export function unattributedBlocks(blocks: readonly string[]): string[] {
+  const attributed = (block: string): boolean =>
+    block.includes(NO_SOURCE) || CITATION.test(block);
+
+  return blocks.filter((block, i) => {
+    if (attributed(block)) return false;
+    const next = blocks[i + 1];
+    if (block.endsWith(":") && next !== undefined && attributed(next)) return false;
+    return true;
+  });
+}
 
 /**
  * Report elapsed time while something slow runs, so a call that is thinking
@@ -154,9 +180,7 @@ export function qualitySuite(): Suite {
         // catches an assertion with nothing behind it. The second catches the
         // way a model games the first: marking everything as a gap.
         const sentences = attributionBlocks(out.text);
-        const unattributed = sentences.filter(
-          (line) => !line.includes(NO_SOURCE) && !CITATION.test(line),
-        );
+        const unattributed = unattributedBlocks(sentences);
         results.push(
           check(
             `${label}: every point is attributed or marked as a gap`,
