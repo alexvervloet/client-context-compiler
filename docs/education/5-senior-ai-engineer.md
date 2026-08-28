@@ -28,7 +28,18 @@ The claim is real, cited, and about the wrong principal.
 
 Concretely: two clients of one advisor co-own an LLC, email each other with her
 copied, and one mentions his daughter's tuition due September 12. Compile the
-other man's meeting prep. Every control says yes and the output is a disclosure.
+other man's meeting prep. Every control says yes and the output asserts the
+obligation as the subject's.
+
+Worth stating precisely, because the flagship trap is a misattribution rather
+than a disclosure and conflating the two weakens the argument. Whitfield is a
+named recipient of all three messages on that thread; he learns nothing. What
+the pipeline produces is a sourced, grounded, false claim about his balance
+sheet, in a document the advisor acts on and the firm retains. The disclosure
+variant exists in the same corpus as `plan_osei_education`, owned by Osei alone,
+and it is the easy half: `servesSubject` drops it on provenance before scoring.
+The shared thread is the case that needs a fence, precisely because both men
+belong on it.
 
 I have not found off-the-shelf tooling for this. The nearest neighbours are
 tenant isolation, which is the wrong granularity because the advisor is
