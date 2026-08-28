@@ -190,3 +190,34 @@ failures to be about formatting until proven otherwise.
 It did earn its keep once: it caught the model opening every briefing with a
 preamble restating when the context was compiled. That was a real product
 problem, fixed in the prompt rather than in the eval.
+
+## The estimator was biased the wrong way, and said so in a comment
+
+**Expected:** the token estimator overcounts. I wrote that in its docstring and
+gave the reason: an overcount wastes a little budget, an undercount overflows
+the window and fails in front of a user. The whole design rested on it.
+
+**What happened:** measured against `count_tokens`, it ran 15.6% low on
+average, 29.5% low at worst, and low on **100%** of samples. It never once
+overcounted. The bias was exactly inverted from the stated intent, so every
+window that reported fitting inside its budget was measured with the wrong
+ruler and was really up to 30% larger than claimed. The `usedTokens <=
+budgetTokens` assertion in the packer had been passing for weeks and meant
+nothing.
+
+The cause was one line: `letters = word.length - symbols` lumped digits in with
+letters and divided the lot by four. A BPE tokenizer groups digits far more
+tightly, and this corpus is dates, dollar amounts, account numbers and email
+addresses. The structural fix alone only closed the gap to about 1.17x, short
+of the 1.42x needed, so the conservative direction is now an explicit margin
+derived from the measurement.
+
+What makes this the most useful thing measuring found: nothing failed. No test
+went red, no window overflowed in practice, and the code carried a confident
+comment asserting the opposite of the truth. It would have shipped.
+
+**Next time:** a comment claiming a numeric property is a hypothesis until
+something checks it. If a constant encodes an assumption about a model's
+behaviour, the thing that measures it belongs in the repo next to it, and the
+measurement should say out loud when the assumption is violated rather than
+printing a number and leaving the reader to notice the sign.
