@@ -248,6 +248,12 @@ Everything defaults to Opus. Routing down is a decision that has to earn itself
 against a measured quality number, which is what the eval suite is for. Routing
 down on a hunch is how a compliance review quietly gets worse.
 
+The rationales above are currently opinions. `npm run bench` turns them into a
+table: latency, cost, fabricated keys, uncited claims and foreign references per
+task per model, over identical compiled windows so the model is the only
+variable. It needs credentials and refuses to run without them, because a model
+comparison assembled from stub output looks exactly like a real one.
+
 ## Evals
 
 ```
