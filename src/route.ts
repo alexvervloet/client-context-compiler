@@ -6,9 +6,19 @@
  * than a clean one, whatever the task was called, and the routing table can
  * see that before the model does.
  *
- * Everything routes to Opus by default. A cheaper model is a decision that has
- * to earn itself against a measured quality number, which is what evals/ is
- * for. Routing down on a hunch is how a compliance review quietly gets worse.
+ * The defaults are the cheap tier, and that is a deliberate reversal.
+ *
+ * They used to be Opus everywhere, on the reasoning that routing down should
+ * have to earn itself against a measured quality number. The flaw in that
+ * argument is that routing *up* was not being held to the same standard: with
+ * the bench unrun, Opus everywhere was equally unmeasured, and it was the
+ * expensive kind of unmeasured. Cost is known in advance; quality is not.
+ * Defaulting to the known-cheap option while the quality question is open is
+ * the reversible choice.
+ *
+ * This table is provisional until `npm run bench` has been run. If Haiku turns
+ * out to fabricate citations or miss the stale-note contradiction, that is a
+ * measured reason to move a row up, and the bench will show it.
  */
 
 import type { Manifest, TaskKind } from "./types.ts";
@@ -59,26 +69,34 @@ export type Route = {
  */
 const BASE: Record<TaskKind, Route> = {
   "daily-briefing": {
-    model: "claude-sonnet-5",
-    effort: "medium",
+    model: "claude-haiku-4-5",
+    effort: "low",
     rationale: "high volume, one per client per morning, and a person reads it before acting",
   },
   "meeting-prep": {
-    model: "claude-opus-5",
-    effort: "high",
-    rationale: "the advisor walks into a room holding this",
-  },
-  "post-meeting-followup": {
     model: "claude-sonnet-5",
     effort: "medium",
-    rationale: "summarising what was just agreed, with the meeting note in context",
+    rationale: "the advisor walks into a room holding this, so it is a tier above a briefing",
+  },
+  "post-meeting-followup": {
+    model: "claude-haiku-4-5",
+    effort: "low",
+    rationale: "summarising what was just agreed, with the meeting note already in context",
   },
   "compliance-review": {
-    model: "claude-opus-5",
-    effort: "xhigh",
-    rationale: "audited output, and a wrong answer is a finding rather than an annoyance",
+    model: "claude-sonnet-5",
+    effort: "high",
+    rationale: "audited output, and the most likely row to move up once the bench has run",
   },
 };
+
+/** Cheapest first. Escalation moves one step, never straight to the top. */
+const TIERS: readonly ModelId[] = ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"];
+
+function oneTierUp(model: ModelId): ModelId | undefined {
+  const next = TIERS[TIERS.indexOf(model) + 1];
+  return next;
+}
 
 /** Above this share of admitted passages carrying a caveat, route up. */
 const CAVEAT_ESCALATION = 0.15;
@@ -110,10 +128,11 @@ export function routeFor(task: TaskKind, manifest?: Manifest): Route {
   ).length;
 
   const share = redacted / admitted.length;
-  if (share > CAVEAT_ESCALATION && base.model !== "claude-opus-5") {
+  const escalated = oneTierUp(base.model);
+  if (share > CAVEAT_ESCALATION && escalated !== undefined) {
     return {
-      model: "claude-opus-5",
-      effort: "high",
+      model: escalated,
+      effort: base.effort,
       rationale: `${(share * 100).toFixed(0)}% of admitted passages carry a masked name, which is a harder attribution problem than this task usually is`,
     };
   }
