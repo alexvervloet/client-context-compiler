@@ -70,7 +70,15 @@ function splitParagraphs(body: string, index: MentionIndex): string[] {
   return merged;
 }
 
-function makeChunk(
+/**
+ * Build a chunk from text a connector has already extracted.
+ *
+ * This is the entry point for anyone normalizing their own source system.
+ * `owners` is the field that matters and the one only the connector knows:
+ * whose record this is, from the record's own fields rather than its prose.
+ * Pass an empty list only for firm-level text that is about nobody.
+ */
+export function buildChunk(
   id: string,
   layer: MemoryLayer,
   text: string,
@@ -107,7 +115,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
       `KYC review due: ${p.kyc_review_due}.`,
     ].join("\n");
     chunks.push(
-      makeChunk(
+      buildChunk(
         `ch_crm_${contact.id}`,
         "client",
         text,
@@ -138,7 +146,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
       lines.push(`Date: ${sent.slice(0, 10)}`, "", message.payload.body.data);
 
       chunks.push(
-        makeChunk(
+        buildChunk(
           `ch_msg_${message.id}`,
           "client",
           lines.join("\n"),
@@ -170,7 +178,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
     if (event.description !== undefined) lines.push("", event.description);
 
     chunks.push(
-      makeChunk(
+      buildChunk(
         `ch_ev_${event.id}`,
         "client",
         lines.join("\n"),
@@ -193,7 +201,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
     paragraphs.forEach((paragraph, i) => {
       const text = `Meeting note — ${note.title} (${note.date})\n\n${paragraph}`;
       chunks.push(
-        makeChunk(
+        buildChunk(
           `ch_note_${note.id}_${i}`,
           "client",
           text,
@@ -217,7 +225,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
     paragraphs.forEach((paragraph, i) => {
       const text = `Planning document — ${plan.title} (updated ${plan.updated})\n\n${paragraph}`;
       chunks.push(
-        makeChunk(
+        buildChunk(
           `ch_plan_${plan.id}_${i}`,
           "client",
           text,
@@ -241,7 +249,7 @@ export function normalize(corpus: Corpus, index: MentionIndex = buildMentionInde
     paragraphs.forEach((paragraph, i) => {
       const text = `Firm document — ${doc.title}\n\n${paragraph}`;
       chunks.push(
-        makeChunk(
+        buildChunk(
           `ch_firm_${doc.id}_${i}`,
           "firm",
           text,
