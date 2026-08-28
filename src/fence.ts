@@ -111,11 +111,28 @@ export function fence(chunk: Chunk, options: FenceOptions): FenceVerdict {
     }
   }
 
+  // Provenance is authoritative, and this check has to come before any
+  // reasoning about the prose.
+  //
+  // The record's own fields say whose file this is. Nothing written inside it
+  // can change that: a note in Elena's file that says "For Margaret Chen: the
+  // deposit must clear before closing" is still Elena's note, and it still
+  // carries Elena's deposit. Treating the prose as the better answer let that
+  // passage into Margaret's window, because the only name in it was hers.
+  //
+  // Retrieval hides this for client records, since `servesSubject` checks
+  // owners independently. Conversation turns never go through retrieval, so
+  // the fence is the only gate they meet, and this was the hole in it.
+  const foreignOwners = chunk.owners.filter((c) => c !== subject);
+  if (chunk.owners.length > 0 && !chunk.owners.includes(subject)) {
+    return { action: "refuse", reason: "other-client-only", offending: foreignOwners.sort() };
+  }
+
   const { contaminating, ambiguous } = classify(chunk.mentions, subject);
 
-  // Who this passage is about. An unambiguous name in the text is the best
-  // answer; the source record's own fields are the fallback when the prose
-  // does not commit to anyone.
+  // Who this passage is about, among the clients it legitimately concerns. An
+  // unambiguous name in the text is the best answer; the record's own fields
+  // are the fallback when the prose does not commit to anyone.
   const resolved = new Set<ClientId>();
   for (const mention of chunk.mentions) {
     const only = mention.candidates.length === 1 ? mention.candidates[0] : undefined;
@@ -160,7 +177,6 @@ export function fence(chunk: Chunk, options: FenceOptions): FenceVerdict {
   // masking alone let Osei's tuition obligation through into Whitfield's
   // window in three tasks out of four. So this case refuses under both
   // policies, and redaction is left to handle mentions in passing.
-  const foreignOwners = chunk.owners.filter((c) => c !== subject);
   if (foreignOwners.length > 0) {
     return {
       action: "refuse",
