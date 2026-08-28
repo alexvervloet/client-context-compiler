@@ -77,7 +77,13 @@ mock is worse than no benchmark.
 
 With `ANTHROPIC_API_KEY` set, `npm run evals` adds the grounding and
 attribution suites and `npm run ccc -- answer` generates for real. With
-`VOYAGE_API_KEY` set, retrieval uses real embeddings.
+`VOYAGE_API_KEY` set, retrieval uses real embeddings, cached on disk after the
+first pass.
+
+`npm run measure` is free even with keys set: it uses the mock embedder by
+design, and its only network traffic is `count_tokens`, which is not billed as
+inference. `npm run bench` is the one that spends, and it will not do so
+without `--confirm`.
 
 ## The firm
 

@@ -4,6 +4,13 @@
  * Written as a script rather than typed into the README by hand, because a
  * number in a README that nothing regenerates is a number that was true once.
  *
+ * This script is free to run. Its compilers use the mock embedder on purpose,
+ * because the budget-sweep and fence-cost numbers are properties of the packer
+ * and the fence rather than of retrieval quality, and the README says so. Its
+ * only network traffic is `count_tokens`, which is not billed as inference. An
+ * earlier version of the documentation called it "the cheapest paid command",
+ * which was wrong in the direction that costs somebody money to discover.
+ *
  * Progress goes to stderr, the document to stdout, and `--silent` keeps npm's
  * own banner out of the file:
  *
