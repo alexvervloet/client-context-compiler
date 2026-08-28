@@ -104,3 +104,28 @@ version of it that holds.
 information", and for anything authored by the person being protected it is not
 close. Measure the containment claim before shipping the policy that depends on
 it.
+
+## An absolute similarity threshold does not survive changing the embedder
+
+**Expected:** a `minSimilarity` floor of 0.02 was a harmless guard against
+stuffing the window with junk.
+
+**What happened:** it silently emptied a window. Writing a test that ran the
+compiler against a different, tiny firm through the public API, four records
+and a mock embedder, the record that obviously should have been retrieved was
+not in the manifest at all. Not dropped for budget, not held by the fence.
+Filtered before packing ever saw it.
+
+Two separate mistakes in one line. The number was absolute, so it encoded the
+score distribution of one specific embedding model; the mock and Voyage do not
+share a range, and a threshold tuned against either is wrong for the other.
+And it applied unconditionally, including to a client whose whole file is four
+records, where there is no long tail to trim and nothing to gain by trimming.
+
+Now the floor is a fraction of the best match in that search, and it only fires
+when there are more candidates than `topK`.
+
+**Next time:** any tuned constant that touches model output should be relative
+to something observed in the same call, not absolute. And a knob that can
+return zero results deserves a test that would notice, which is what the
+different-firm test turned out to be.
