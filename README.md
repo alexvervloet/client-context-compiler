@@ -496,6 +496,16 @@ prose is not, and the mock embedder scores lexical overlap rather than meaning,
 so retrieval quality numbers from a keyless run mean nothing. The leak and
 budget numbers do, since those come from deterministic code.
 
+## Explanations, at five levels
+
+The same system explained to five readers, from a high-school Intro to CS
+student up to a senior AI engineer who wants the design review with the sales
+removed. Each one goes as deep as its reader's ceiling allows.
+
+[docs/education/](docs/education/) has the index. Level 4 is written for
+someone interviewing for an AI engineering job without an AI engineering
+background, and the questions in it work regardless of your own depth.
+
 ## Related
 
 Two pieces of this problem I have built before, and deliberately did not rebuild
