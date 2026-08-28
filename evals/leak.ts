@@ -16,25 +16,9 @@ import { CLIENTS, TRAPS, clientById } from "../src/corpus/roster.ts";
 import { TASK_KINDS } from "../src/types.ts";
 import type { ClientId, TaskKind } from "../src/types.ts";
 import type { FencePolicy } from "../src/fence.ts";
+import { foreignMarkers } from "./markers.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
-
-/**
- * Details that belong to exactly one client. If one of these turns up in
- * another client's window, something is broken in a way that matters more than
- * any retrieval metric.
- */
-const PRIVATE_MARKERS: Record<ClientId, string[]> = {
-  cl_osei_james: ["tuition", "$58K", "September 12"],
-  cl_whitfield_james: ["Riverside", "pilot's licence"],
-  cl_okonkwo_ngozi: ["divorce settlement"],
-  cl_okonkwo_adaeze: ["practice buy-in"],
-  cl_okonkwo_chidi: ["angel investing"],
-  cl_chen_david: ["consulting LLC", "a boat"],
-  cl_delgado_elena: ["Sunnyside", "$145K"],
-  cl_delgado_robert: ["dental practice", "1031"],
-  cl_marchetti_sofia: ["restaurant group"],
-};
 
 async function compileFor(
   compiler: Compiler,
@@ -50,16 +34,6 @@ async function compileFor(
     budgetTokens,
     now: NOW,
   });
-}
-
-/** Every marker belonging to somebody else, for a given subject. */
-function foreignMarkers(subject: ClientId): Array<[ClientId, string]> {
-  const out: Array<[ClientId, string]> = [];
-  for (const [owner, markers] of Object.entries(PRIVATE_MARKERS)) {
-    if (owner === subject) continue;
-    for (const marker of markers) out.push([owner, marker]);
-  }
-  return out;
 }
 
 export function leakSuite(policy: FencePolicy): Suite {
