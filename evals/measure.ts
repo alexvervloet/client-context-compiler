@@ -18,11 +18,13 @@ import { normalize } from "../src/normalize.ts";
 import { TASK_KINDS } from "../src/types.ts";
 import type { TaskKind } from "../src/types.ts";
 import type { FencePolicy } from "../src/fence.ts";
-import { measureEstimatorError } from "../src/tokens.ts";
+import { countTokens, measureEstimatorError } from "../src/tokens.ts";
 import { elapsed, note, withHeartbeat } from "./progress.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
 const BUDGETS = [1000, 2000, 4000, 8000, 16000, 32000, 64000];
+/** Big enough that the packer drops nothing for space, so the fence stands alone. */
+const FENCE_COST_BUDGET = 100_000;
 
 const startedAt = performance.now();
 const out: string[] = [];
@@ -102,9 +104,13 @@ say();
 
 say("## What the fence costs");
 say();
-say("Every client, every task, 8000-token budget. A held-back passage is one");
-say("retrieval found, the advisor is authorized to read, and the compiler");
-say("refused because it names someone else.");
+say("Every client, every task, at a budget large enough that nothing is dropped");
+say("for space. Measuring this at a tight budget makes the fence look worse as");
+say("the budget shrinks, because the share is taken over admitted passages and");
+say("those fall; the fence itself refuses the same passages either way.");
+say();
+say("A held-back passage is one retrieval found, the advisor is authorized to");
+say("read, and the compiler refused because it names someone else.");
 say();
 say("| policy | passages admitted | held by the fence | share held back |");
 say("| --- | ---: | ---: | ---: |");
@@ -124,7 +130,7 @@ for (const policy of ["strict", "redact"] as FencePolicy[]) {
         task,
         clientId: client.id,
         advisorId: client.advisorId,
-        budgetTokens: 8000,
+        budgetTokens: FENCE_COST_BUDGET,
         now: NOW,
       });
       for (const entry of compiled.manifest.entries) {
@@ -143,9 +149,14 @@ const strict = policyTotals["strict"];
 const redact = policyTotals["redact"];
 if (strict !== undefined && redact !== undefined) {
   const recovered = redact.admitted - strict.admitted;
+  const share = ((100 * recovered) / strict.admitted).toFixed(2);
   say(
-    `Redaction recovers ${recovered} passages that strict refuses, ` +
-      `which is ${((100 * recovered) / strict.admitted).toFixed(1)}% more context.`,
+    recovered > 0
+      ? `Redaction admits ${recovered} passages that strict refuses, ` +
+          `which is ${share}% more context.`
+      : `Redaction admits ${recovered} passages relative to strict (${share}%). ` +
+          "The mask is longer than most of the names it replaces, so a redacted " +
+          "passage costs more tokens than the original and can push another out.",
   );
   say();
 }
@@ -214,6 +225,73 @@ if (!hasKey) {
   }
 }
 say();
+
+// ------------------------------------------- estimator error on whole windows
+
+say("## Estimator error on a whole window");
+say();
+say("The per-chunk numbers above are the wrong basis for the safety margin and");
+say("are the reason it is as large as it is. The margin has to cover the worst");
+say("*chunk*, but the budget is a property of the whole *window*, where a few");
+say("hundred chunk-level errors average out. This measures the thing the");
+say("guarantee is actually about.");
+say();
+
+if (!hasKey) {
+  say("Not measured on this run: no Anthropic credentials.");
+} else {
+  note("counting real tokens for a handful of compiled windows");
+  say("| client | task | budget | estimated | actual | error |");
+  say("| --- | --- | ---: | ---: | ---: | ---: |");
+
+  const windowCases: Array<{ clientId: string; task: TaskKind; budget: number }> = [
+    { clientId: "cl_whitfield_james", task: "meeting-prep", budget: 8000 },
+    { clientId: "cl_chen_margaret", task: "compliance-review", budget: 8000 },
+    { clientId: "cl_okonkwo_adaeze", task: "meeting-prep", budget: 16000 },
+    { clientId: "cl_delgado_robert", task: "daily-briefing", budget: 4000 },
+  ];
+
+  const windowErrors: number[] = [];
+  for (const [i, c] of windowCases.entries()) {
+    note(`  [${i + 1}/${windowCases.length}] ${c.clientId} / ${c.task}`);
+    const client = CLIENTS.find((x) => x.id === c.clientId);
+    if (client === undefined) continue;
+    const compiled = await compiler.compile({
+      task: c.task,
+      clientId: c.clientId,
+      advisorId: client.advisorId,
+      budgetTokens: c.budget,
+      now: NOW,
+    });
+    const actual = await countTokens(compiled.text);
+    const relative = (compiled.manifest.usedTokens - actual) / actual;
+    windowErrors.push(relative);
+    say(
+      `| ${c.clientId} | ${c.task} | ${c.budget} | ${compiled.manifest.usedTokens} ` +
+        `| ${actual} | ${(relative * 100).toFixed(1)}% |`,
+    );
+  }
+
+  say();
+  const worst = Math.min(...windowErrors);
+  const mean = windowErrors.reduce((a, b) => a + b, 0) / windowErrors.length;
+  say(
+    `Window-level error: mean ${(mean * 100).toFixed(1)}%, worst ` +
+      `${(worst * 100).toFixed(1)}%. Every window fit inside its budget in real ` +
+      `tokens: ${windowErrors.every((e) => e >= 0) ? "yes" : "**no**"}.`,
+  );
+  say();
+  if (worst > 0) {
+    const headroom = 1 / (1 + worst);
+    say(
+      `The margin could come down to about ${(1.3 * headroom).toFixed(2)} and still ` +
+        "leave every window in this sample inside its budget, recovering most of " +
+        "the wasted space. Four windows is not enough evidence to make that change " +
+        "on; widen this sample before touching TOKEN_SAFETY_MARGIN.",
+    );
+    say();
+  }
+}
 
 note(`done in ${elapsed(startedAt)}`);
 process.stdout.write(`${out.join("\n")}\n`);
