@@ -37,14 +37,48 @@ const LIVE_CASES: Array<{ clientId: string; task: TaskKind }> = [
   { clientId: "cl_delgado_robert", task: "daily-briefing" },
 ];
 
-/** A sentence that asserts something. Headings and list markers do not. */
-function factualSentences(text: string): string[] {
-  return text
-    .split(/\n+/)
-    .flatMap((line) => line.split(/(?<=[.?!])\s+/))
-    .map((s) => s.trim())
-    .filter((s) => s.length > 40 && !s.startsWith("#"));
+/**
+ * The unit of attribution: a bullet or a paragraph, not a sentence.
+ *
+ * Sentence splitting was the wrong unit twice over. It cut inside quoted
+ * material, so a briefing quoting a source email ("she wrote \"That is lower
+ * than I expected.\"") came apart into an orphaned fragment with no citation,
+ * and quoting the source is behaviour worth encouraging. And it demanded a key
+ * after every sentence, which is not how cited writing works: a two-sentence
+ * point drawn from one record carries one citation at the end of it.
+ *
+ * Blocks are weaker than sentences, and worth being explicit about. A bullet
+ * whose first half came from one record and second half from another passes
+ * with only the second cited. Nothing lexical catches that. What does catch
+ * the version of it that matters is the foreign-reference check below, which
+ * fails if any name in the output resolves to another client.
+ */
+export function attributionBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  let current = "";
+
+  const flush = (): void => {
+    if (current !== "") blocks.push(current);
+    current = "";
+  };
+
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("#")) {
+      flush();
+      continue;
+    }
+    // A new list item starts a block; anything else continues the current one,
+    // so a wrapped line stays with the citation at the end of its bullet.
+    if (/^([-*\u2022]|\d+[.)])\s/.test(line) && current !== "") flush();
+    current = current === "" ? line : `${current} ${line}`;
+  }
+  flush();
+
+  return blocks.filter((block) => block.length > 40);
 }
+
+export const CITATION = /\[[a-z]+:[a-z-]+\//;
 
 /**
  * Report elapsed time while something slow runs, so a call that is thinking
@@ -119,28 +153,28 @@ export function qualitySuite(): Suite {
         // Two checks, because they fail in opposite directions. The first
         // catches an assertion with nothing behind it. The second catches the
         // way a model games the first: marking everything as a gap.
-        const sentences = factualSentences(out.text);
+        const sentences = attributionBlocks(out.text);
         const unattributed = sentences.filter(
-          (line) => !line.includes(NO_SOURCE) && !/\[[a-z]+:[a-z-]+\//.test(line),
+          (line) => !line.includes(NO_SOURCE) && !CITATION.test(line),
         );
         results.push(
           check(
-            `${label}: every factual sentence is attributed or marked as a gap`,
+            `${label}: every point is attributed or marked as a gap`,
             unattributed.length === 0,
             unattributed.length === 0
               ? ""
               : `${unattributed.length} of ${sentences.length} unattributed, ` +
-                `first: ${unattributed[0]?.slice(0, 90)}`,
+                `first: ${unattributed[0]?.slice(0, 120)}`,
           ),
         );
 
-        const sourced = sentences.filter((line) => /\[[a-z]+:[a-z-]+\//.test(line)).length;
+        const sourced = sentences.filter((line) => CITATION.test(line)).length;
         const sourcedShare = sentences.length === 0 ? 1 : sourced / sentences.length;
         results.push(
           check(
             `${label}: the answer is mostly sourced, not mostly gaps`,
             sourcedShare >= 0.5,
-            `only ${sourced} of ${sentences.length} sentences cite a record ` +
+            `only ${sourced} of ${sentences.length} points cite a record ` +
               `(${(sourcedShare * 100).toFixed(0)}%)`,
           ),
         );
