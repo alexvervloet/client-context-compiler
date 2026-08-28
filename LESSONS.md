@@ -129,3 +129,29 @@ when there are more candidates than `topK`.
 to something observed in the same call, not absolute. And a knob that can
 return zero results deserves a test that would notice, which is what the
 different-firm test turned out to be.
+
+## Batched output made a working eval run look like a hang
+
+**Expected:** the eval runner collected results and printed a report at the
+end. Offline that is a five-second wait and reads fine.
+
+**What happened:** the first person to run it with credentials saw the npm
+header and then nothing, and reasonably concluded it had frozen. It had not.
+The live suite embeds the whole corpus and then makes six model calls with
+adaptive thinking at high effort, and every one of those minutes produced no
+output at all, because the runner had nothing to say until the last suite
+finished.
+
+Two things were wrong underneath the silence. `fetch` has no default timeout,
+so a stalled embedding request would genuinely hang forever with no error. And
+the Anthropic SDK defaults to a ten-minute timeout with two retries, so a
+wedged request can sit for half an hour looking exactly like a slow one.
+
+Now suites stream their result as they finish, live suites report each case
+with model, elapsed time and cost, indexing reports batch progress, and both
+network paths have finite timeouts.
+
+**Next time:** any output that batches is fine until the thing it wraps gets
+slow, and the failure mode is a bug report about a hang that is not a hang.
+If a step can take minutes, it has to say something while it does. And a
+network call without an explicit timeout is a hang waiting for a bad day.
