@@ -37,7 +37,7 @@ import type { TaskKind } from "../src/types.ts";
 import { elapsed, note, withHeartbeat } from "./progress.ts";
 import { ledger, projectWorstCaseUsd } from "../src/spend.ts";
 import { estimateTokens } from "../src/tokens.ts";
-import { buildPrompt } from "../src/answer.ts";
+import { SYSTEM_PROMPT_SAMPLE } from "../src/answer.ts";
 import { attributionBlocks, unattributedBlocks } from "./attribution.ts";
 import { measureRecall } from "./findings.ts";
 
@@ -112,35 +112,22 @@ type Row = {
 const benchStartedAt = performance.now();
 const totalCalls = TASK_KINDS.length * models.length * repeats;
 
-const embedder = resolveEmbedder();
-note(`building the index with ${embedder.name}`);
-const compiler = await makeCompiler({
-  embedder,
-  onIndexProgress: (done, total) => {
-    if (done % 384 === 0 || done === total) note(`  embedded ${done}/${total}`);
-  },
-});
-
 // ------------------------------------------------- what is this going to cost
+//
+// Projected before anything is built, because building the index is itself a
+// paid call: 787 chunks through a real embedding model. The first version of
+// this gate sat *after* the index and then announced that nothing had been
+// spent, which was not true.
+//
+// The window cannot exceed BUDGET by construction, so that plus the system
+// prompt is a genuine upper bound on input and needs no index to compute.
 
-const contexts = new Map<TaskKind, Awaited<ReturnType<typeof compiler.compile>>>();
+const SYSTEM_OVERHEAD = estimateTokens(SYSTEM_PROMPT_SAMPLE);
 let worstCaseUsd = 0;
-
 for (const task of TASK_KINDS) {
-  const clientId = SUBJECTS[task];
-  const client = clientById(clientId);
-  const context = await compiler.compile({
-    task,
-    clientId,
-    advisorId: client.advisorId,
-    budgetTokens: BUDGET,
-    now: NOW,
-  });
-  contexts.set(task, context);
-
-  const promptTokens = estimateTokens(buildPrompt(context, task));
   for (const model of models) {
-    worstCaseUsd += projectWorstCaseUsd(model, promptTokens, MAX_OUTPUT[task]) * repeats;
+    worstCaseUsd +=
+      projectWorstCaseUsd(model, BUDGET + SYSTEM_OVERHEAD, MAX_OUTPUT[task]) * repeats;
   }
 }
 
@@ -152,8 +139,8 @@ note(`spend cap for this process: $${ledger.capUsd.toFixed(2)} (SPEND_CAP_USD)`)
 note("");
 
 if (values.confirm !== true) {
-  note("Dry run. Nothing has been spent and nothing will be.");
-  note("Re-run with --confirm to make the calls:");
+  note("Dry run. No network calls have been made, embeddings included.");
+  note("Re-run with --confirm to build the index and make the calls:");
   note("");
   note(`  secrun npm run bench -- --confirm${values.models === undefined ? "" : ` --models ${values.models}`}`);
   note("");
@@ -167,6 +154,31 @@ if (worstCaseUsd > ledger.capUsd) {
       "deliberately with SPEND_CAP_USD.",
   );
   process.exit(2);
+}
+
+const embedder = resolveEmbedder();
+note(`building the index with ${embedder.name}`);
+const compiler = await makeCompiler({
+  embedder,
+  onIndexProgress: (done, total) => {
+    if (done % 384 === 0 || done === total) note(`  embedded ${done}/${total}`);
+  },
+});
+
+const contexts = new Map<TaskKind, Awaited<ReturnType<typeof compiler.compile>>>();
+for (const task of TASK_KINDS) {
+  const clientId = SUBJECTS[task];
+  const client = clientById(clientId);
+  contexts.set(
+    task,
+    await compiler.compile({
+      task,
+      clientId,
+      advisorId: client.advisorId,
+      budgetTokens: BUDGET,
+      now: NOW,
+    }),
+  );
 }
 
 const rows: Row[] = [];
