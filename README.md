@@ -31,6 +31,13 @@ the current conversation, with shares that change per task. A compliance review
 spends 35% of its budget on the firm's own documentation standard. A daily
 briefing spends 10%.
 
+**Fences the conversation too.** The session layer is where cross-client bleed
+actually happens in a product, and retrieval is not involved in it at all. An
+advisor preps one client at nine and another at nine fifteen, then asks "what
+about the September obligation?" without saying whose. That turn names nobody,
+so no amount of mention detection helps. What it has is a recorded subject, and
+that is the whole defence.
+
 **Fences the window to one client, in code.** Not in a system prompt. The
 packer refuses to emit text that names somebody else, and re-checks the
 assembled window before returning it. If the fence has a hole, the compile
@@ -108,13 +115,13 @@ Meeting prep for James Whitfield, strict fence, mock embeddings.
 
 | budget | used | fill | passages admitted | dropped for budget | held by the fence |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1000 | 975 | 98% | 9 | 52 | 3 |
-| 2000 | 1940 | 97% | 20 | 41 | 3 |
-| 4000 | 3980 | 100% | 43 | 18 | 3 |
-| 8000 | 5523 | 69% | 61 | 0 | 3 |
-| 16000 | 5523 | 35% | 61 | 0 | 3 |
-| 32000 | 5523 | 17% | 61 | 0 | 3 |
-| 64000 | 5523 | 9% | 61 | 0 | 3 |
+| 1000 | 975 | 98% | 9 | 67 | 6 |
+| 2000 | 1953 | 98% | 20 | 56 | 6 |
+| 4000 | 3921 | 98% | 42 | 34 | 6 |
+| 8000 | 6807 | 85% | 76 | 0 | 6 |
+| 16000 | 6807 | 43% | 76 | 0 | 6 |
+| 32000 | 6807 | 21% | 76 | 0 | 6 |
+| 64000 | 6807 | 11% | 76 | 0 | 6 |
 
 ## What the fence costs
 
@@ -124,10 +131,10 @@ refused because it names someone else.
 
 | policy | passages admitted | held by the fence | share held back |
 | --- | ---: | ---: | ---: |
-| strict | 2428 | 88 | 3.5% |
-| redact | 2434 | 82 | 3.3% |
+| strict | 3524 | 132 | 3.6% |
+| redact | 3532 | 124 | 3.4% |
 
-Redaction recovers 6 passages that strict refuses, which is 0.2% more context.
+Redaction recovers 8 passages that strict refuses, which is 0.2% more context.
 
 ## Token estimator error
 
@@ -135,12 +142,11 @@ Not measured on this run: no Anthropic credentials. The estimator's
 accuracy against the real tokenizer is unverified until this is run
 with a key, and the number below should not be quoted from a mock run.
 
-
 ## Reading the numbers
 
 Two things in the sweep table are worth more than the rest.
 
-Past 8,000 tokens the window stops growing. It saturates at 5,523 and stays
+Past 8,000 tokens the window stops growing. It saturates at 6,807 and stays
 there whether the budget is 8k or 64k, because by then retrieval has returned
 everything that passes the client filter. The binding constraint moved from the
 budget to the retriever, and eight times the context window bought nothing. That
@@ -148,7 +154,7 @@ is the concrete version of "just add more context isn't always the answer": at
 some point you are not short of room, you are short of candidates, and the fix
 is upstream.
 
-The fence holds back 3.5% of what retrieval finds. Not 30%, and not 0.1%. Small
+The fence holds back 3.6% of what retrieval finds. Not 30%, and not 0.1%. Small
 enough that refusing is affordable, large enough that a pipeline without a fence
 is shipping other people's information into roughly one passage in thirty.
 
@@ -179,6 +185,13 @@ own. Kept whole, the document is unusable for anybody. The corollary bit: a
 merge rule that combines a short paragraph with its neighbour is a boundary
 decision in disguise, and it silently cost two clients their account balances
 before it got a client-boundary check.
+
+**The relevance floor is relative, and conditional.** An absolute cosine
+threshold does not survive a change of embedding model: the mock here scores in
+a different range than Voyage, and a number tuned against one silently empties
+windows under the other. The floor is a fraction of the best match in that
+search, and it only fires when there are more candidates than `topK`, because
+its job is trimming a long tail and a client with a thin file does not have one.
 
 **The client filter runs before scoring, not after.** Filtering after ranking
 leaks through top-k, and it means a forbidden chunk was ranked, logged and
@@ -212,7 +225,7 @@ So redaction now only applies where the other client is mentioned in passing in
 a record somebody else owns: an advisor's note about one client that reaches for
 another as a comparison. If the other client is party to the record, both
 policies refuse it. That is a much smaller feature than intended and it is the
-only version that holds up. It recovers 6 passages out of 2,428.
+only version that holds up. It recovers 8 passages out of 3,524.
 
 Strict is the default and should stay the default.
 
@@ -243,11 +256,13 @@ PASS  cross-client leakage (policy: redact)  (48/48)
 PASS  named traps (policy: strict)          (6/6)
 PASS  named traps (policy: redact)          (6/6)
 PASS  authorization                         (13/13)
+PASS  conversation carry-over               (108/108)
 PASS  budget and manifest                   (61/61)
 SKIP  grounding and attribution
 ```
 
-The leak, trap, authorization and budget suites need no model and no key. They
+The leak, trap, authorization, carry-over and budget suites need no model and
+no key. They
 test deterministic code, so they run in CI on every push and gate the merge.
 
 The grounding and attribution suites need a live model and report as **skipped**
@@ -261,6 +276,48 @@ breaking the other is exactly the regression this is here to catch.
 The leak suite checks for private *details*, not only for names. That matters:
 the fence bug described above leaked no names at all.
 
+Carry-over runs every ordered pair of one advisor's clients rather than a pair
+chosen to collide, and checks the reverse too: a session compiled for the client
+it is actually about must keep its turns. A layer that dropped everything would
+pass the first half perfectly.
+
+## Using it on your own data
+
+The bundled firm is the default, not a dependency. Supply your own chunks and a
+directory and nothing from `src/corpus/` is involved:
+
+```ts
+import { buildChunk, buildMentionIndex, makeCompiler } from "client-context-compiler";
+
+const directory = { clients: [
+  { id: "c_8812", first: "Margaret", last: "Chen",
+    email: "m.chen@example.com", advisorId: "adv_reyes" },
+]};
+
+const index = buildMentionIndex(directory.clients);
+
+const chunks = crmRecords.map((record) =>
+  buildChunk(
+    record.id,
+    "client",
+    renderRecord(record),
+    { system: "crm", kind: "contact", id: record.id, label: `CRM: ${record.name}` },
+    record.updatedAt,
+    index,
+    [clientIdFor(record)],   // owners: whose record this is
+  ),
+);
+
+const compiler = await makeCompiler({ chunks, directory });
+```
+
+The connector is yours. The one field worth care is `owners`: whose record this
+is, taken from the record's own fields rather than its prose. That is what the
+fence falls back on when the text names nobody, and it is the difference between
+a session turn saying "what about that?" being safe and being a leak.
+
+`src/index.ts` is the public surface. Everything else moves without warning.
+
 ## Limitations
 
 Mention detection is a roster lookup with span precedence. It handles surnames,
@@ -272,8 +329,6 @@ The corpus is synthetic. The relationships in it are the realistic part; the
 prose is not, and the mock embedder scores lexical overlap rather than meaning,
 so retrieval quality numbers from a keyless run mean nothing. The leak and
 budget numbers do, since those come from deterministic code.
-
-The conversation layer accepts turns but nothing in this repository writes them.
 
 ## Related
 
