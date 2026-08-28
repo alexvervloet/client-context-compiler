@@ -304,3 +304,31 @@ spend. Authorise before the call using the worst case the request permits, not
 after it using what it actually cost, because after is accounting and before is
 a control. And when a task is "make something expensive measurable", the
 measurement harness is the first thing that needs the limit, not the last.
+
+## "The dry run costs nothing" was false, and I said it out loud
+
+**Expected:** a bench that prints a projection and exits before making model
+calls spends nothing.
+
+**What happened:** it spent money every time. The gate sat after the index was
+built, and building the index puts all 787 chunks through a paid embedding
+model. So the sequence was: embed the entire corpus, then print "Dry run.
+Nothing has been spent and nothing will be." I wrote that message, watched a
+run produce it directly underneath three lines of embedding progress, and did
+not notice.
+
+Two things wrong. The gate was in the wrong place, and it did not need the
+index at all: the window cannot exceed its budget by construction, so the
+worst-case projection is computable from constants.
+
+And there was no cache. The corpus is deterministic from a seed, and the same
+787 chunks were re-embedded on every run of the evals, the measurement script
+and the bench. Across one afternoon that is nine or so identical paid passes
+over a corpus that had not changed once.
+
+**Next time:** "costs nothing" is a claim about every call in the path, not
+just the expensive one you were thinking about. When a script has two paid
+dependencies, a cost gate that only knows about one of them is worse than no
+gate, because it prints a reassuring number. Trace the whole path before
+writing the reassurance, and put the gate before the first call rather than
+before the first *interesting* call.

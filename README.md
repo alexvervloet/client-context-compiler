@@ -308,14 +308,24 @@ until the bench has run.
 ```
 8 calls: 4 tasks x 2 models x 1.
 models: claude-haiku-4-5, claude-sonnet-5
-worst case if every call generates to its limit: $0.35
+worst case if every call generates to its limit: $0.38
 spend cap for this process: $0.50 (SPEND_CAP_USD)
 
-Dry run. Nothing has been spent and nothing will be.
+Dry run. No network calls have been made, embeddings included.
 ```
 
 It spends nothing until `--confirm`, refuses to start if the projection is above
 the cap, and Opus is opt-in rather than included.
+
+"Nothing" is meant literally, and it did not used to be. The gate originally sat
+*after* the index was built, and building the index means putting 787 chunks
+through a paid embedding model. It then printed a message saying nothing had
+been spent. The projection needs no index — the window cannot exceed the budget
+by construction — so the gate now runs before any network call at all.
+
+Embeddings are also cached on disk under `out/`, keyed by model and content
+hash. The corpus is deterministic from a seed, and it was being re-embedded from
+scratch on every run of the evals, the measurement script and the bench.
 
 That is not how it started. The first version made twelve calls across all three
 models with `effort` forced to high and `max_tokens` of 16000, and adaptive
