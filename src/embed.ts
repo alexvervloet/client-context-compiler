@@ -9,6 +9,8 @@
  * benchmark.
  */
 
+import { withDiskCache } from "./embed-cache.ts";
+
 const MOCK_DIMENSIONS = 256;
 
 export type Embedder = {
@@ -126,7 +128,13 @@ let warned = false;
  */
 export function resolveEmbedder(env: NodeJS.ProcessEnv = process.env): Embedder {
   const key = env["VOYAGE_API_KEY"];
-  if (key !== undefined && key !== "") return makeVoyageEmbedder(key);
+  if (key !== undefined && key !== "") {
+    // Cached by default. The corpus does not change between runs and a paid
+    // embedding call for text already embedded is money for nothing.
+    return env["EMBED_CACHE"] === "0"
+      ? makeVoyageEmbedder(key)
+      : withDiskCache(makeVoyageEmbedder(key));
+  }
 
   if (env["EMBEDDINGS_STRICT"] === "1") {
     throw new Error(
