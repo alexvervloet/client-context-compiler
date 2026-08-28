@@ -58,7 +58,7 @@ test("retrieval never returns a record owned by somebody else", async () => {
   const built = await buildIndex(chunks, makeMockEmbedder());
 
   for (const subject of ["c_a", "c_b", "c_c"]) {
-    const results = await search(built, {
+    const { candidates: results } = await search(built, {
       query: "anything at all",
       subject,
       now: "2026-08-27T09:00:00Z",
@@ -162,4 +162,54 @@ test("the mask is visible in the text, not a silent deletion", () => {
   assert.ok(verdict.text.includes(MASK), "the redacted passage must show where a name was removed");
   assert.ok(!verdict.text.includes("Carla"));
   assert.ok(verdict.text.includes("Anna Ashford"), "the subject's own name must survive");
+});
+
+// ------------------------------------------------- drop reasons that never fired
+
+test("candidates ranked out by topK are named in the manifest", async () => {
+  // The audit found `below-relevance` was a member of the DropReason union
+  // that no line of code constructed, and that nothing truncated on the
+  // bundled corpus by arithmetic accident: 78-89 eligible against a topK of
+  // 120. On a real book a client has more records than that, and a manifest
+  // that silently omits them is not the complete account it claims to be.
+  const many: Chunk[] = [];
+  for (let i = 0; i < 200; i++) {
+    many.push(chunk(`m${i}`, `Anna Ashford note ${i}. Allocation review and rebalance.`, ["c_a"]));
+  }
+  const built = await buildIndex(many, makeMockEmbedder());
+  const { candidates, dropped } = await search(built, {
+    query: "allocation review",
+    subject: "c_a",
+    now: "2026-08-27T09:00:00Z",
+    topK: 20,
+  });
+
+  assert.equal(candidates.length, 20);
+  assert.ok(dropped.length > 0, "180 eligible records lost to topK must be reported");
+  assert.ok(dropped[0]?.detail.includes("topK"));
+});
+
+test("a duplicate passage is dropped with a reason rather than repeated", async () => {
+  const { pack } = await import("../src/pack.ts");
+  const text = "Anna Ashford is selling the warehouse in October for $2.4M.";
+  const twice = [chunk("d1", text, ["c_a"]), chunk("d2", text, ["c_a"])];
+
+  const out = pack({
+    request: {
+      task: "meeting-prep",
+      clientId: "c_a",
+      advisorId: "adv",
+      budgetTokens: 4000,
+      now: "2026-08-27T09:00:00Z",
+    },
+    candidates: twice.map((c) => ({ chunk: c, similarity: 1, recency: 1, score: 1 })),
+    authorized: AUTHORIZED,
+    index,
+    clientName: "Anna Ashford",
+  });
+
+  const dropped = out.manifest.entries.filter((e) => !e.admitted);
+  assert.equal(dropped.length, 1, "the second copy should be dropped, not admitted twice");
+  assert.ok(dropped[0]?.admitted === false && dropped[0].reason === "duplicate");
+  assert.equal(out.text.split("selling the warehouse").length - 1, 1);
 });

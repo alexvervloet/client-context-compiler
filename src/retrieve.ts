@@ -76,10 +76,23 @@ const DEFAULTS = {
   relativeFloor: 0.15,
 };
 
+export type SearchResult = {
+  candidates: Candidate[];
+  /**
+   * Eligible chunks that lost to `topK` or the relevance floor.
+   *
+   * Returned rather than discarded so the manifest can account for them. A
+   * manifest that only lists what survived retrieval is not the complete
+   * record of a decision, it is the record of the decisions made after the
+   * interesting one.
+   */
+  dropped: Array<{ chunk: Chunk; score: number; detail: string }>;
+};
+
 export async function search(
   index: SearchIndex,
   options: SearchOptions,
-): Promise<Candidate[]> {
+): Promise<SearchResult> {
   const topK = options.topK ?? DEFAULTS.topK;
   const recencyWeight = options.recencyWeight ?? DEFAULTS.recencyWeight;
   const halfLifeDays = options.halfLifeDays ?? DEFAULTS.halfLifeDays;
@@ -119,12 +132,29 @@ export async function search(
   // own best match, because an absolute cosine does not survive a change of
   // embedding model.
   const applyFloor = scored.length > topK && best > 0;
-  const candidates = applyFloor
-    ? scored.filter((c) => c.similarity >= best * relativeFloor)
-    : scored;
+  const floor = best * relativeFloor;
+  const dropped: SearchResult["dropped"] = [];
 
-  candidates.sort((a, b) => b.score - a.score);
-  return candidates.slice(0, topK);
+  const abovefloor = scored.filter((c) => {
+    if (!applyFloor || c.similarity >= floor) return true;
+    dropped.push({
+      chunk: c.chunk,
+      score: c.score,
+      detail: `similarity ${c.similarity.toFixed(3)} is below ${(relativeFloor * 100).toFixed(0)}% of the best match (${best.toFixed(3)})`,
+    });
+    return false;
+  });
+
+  abovefloor.sort((a, b) => b.score - a.score);
+  for (const [rank, candidate] of abovefloor.slice(topK).entries()) {
+    dropped.push({
+      chunk: candidate.chunk,
+      score: candidate.score,
+      detail: `ranked ${topK + rank + 1} of ${abovefloor.length}, past a topK of ${topK}`,
+    });
+  }
+
+  return { candidates: abovefloor.slice(0, topK), dropped };
 }
 
 /**

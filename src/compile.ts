@@ -125,7 +125,7 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
       }
 
       const query = [TASK_QUERIES[request.task], request.query ?? ""].join(" ").trim();
-      const candidates = await search(index, {
+      const { candidates, dropped } = await search(index, {
         query,
         subject: request.clientId,
         now: request.now,
@@ -135,6 +135,7 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
       const compiled = pack({
         request,
         candidates,
+        retrievalDropped: dropped,
         conversation: session === undefined ? [] : conversationChunks(session, mentions),
         authorized: authorizedFor(request.advisorId, directory),
         index: mentions,

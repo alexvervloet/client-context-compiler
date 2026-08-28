@@ -50,6 +50,8 @@ export type PackInput = {
   request: CompileRequest;
   /** Scored candidates from retrieval: client history and firm knowledge. */
   candidates: Candidate[];
+  /** Eligible chunks retrieval ranked out, so the manifest can name them. */
+  retrievalDropped?: Array<{ chunk: Chunk; score: number; detail: string }>;
   /** This session's turns, oldest first. Not retrieved, always considered. */
   conversation?: Chunk[];
   /** Every client the advisor may see. */
@@ -75,7 +77,18 @@ export function pack(input: PackInput): CompiledContext {
   const subject = request.clientId;
   const budgets = LAYER_BUDGETS[request.task];
 
-  const entries: ManifestEntry[] = [];
+  // Recorded first, so the manifest accounts for everything that was eligible
+  // rather than only for what survived ranking.
+  const entries: ManifestEntry[] = (input.retrievalDropped ?? []).map((d) => ({
+    admitted: false as const,
+    chunkId: d.chunk.id,
+    ref: d.chunk.ref,
+    layer: d.chunk.layer,
+    tokens: d.chunk.tokens,
+    score: d.score,
+    reason: "below-relevance" as const,
+    detail: d.detail,
+  }));
   const admitted: Record<MemoryLayer, Admitted[]> = { firm: [], client: [], conversation: [] };
   const seenText = new Set<string>();
 
