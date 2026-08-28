@@ -23,7 +23,7 @@ import type { MentionIndex } from "./mentions.ts";
 import { resolveEmbedder } from "./embed.ts";
 import type { Embedder } from "./embed.ts";
 import { buildIndex, search } from "./retrieve.ts";
-import type { SearchIndex } from "./retrieve.ts";
+import type { IndexProgress, SearchIndex } from "./retrieve.ts";
 import { pack } from "./pack.ts";
 import { conversationChunks } from "./session.ts";
 import type { Session } from "./session.ts";
@@ -64,6 +64,8 @@ export type CompilerOptions = {
   embedder?: Embedder;
   policy?: FencePolicy;
   seed?: number;
+  /** Called after each embedding batch. Real embedders take a while. */
+  onIndexProgress?: IndexProgress;
 };
 
 export type Compiler = {
@@ -84,7 +86,7 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
   const chunks =
     options.chunks ?? normalize(options.corpus ?? generateCorpus(options.seed), mentions);
   const embedder = options.embedder ?? resolveEmbedder();
-  const index = await buildIndex(chunks, embedder);
+  const index = await buildIndex(chunks, embedder, options.onIndexProgress);
   const policy = options.policy ?? "strict";
 
   const lookup = (clientId: ClientId): DirectoryEntry => {

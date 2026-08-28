@@ -76,7 +76,15 @@ export function cosine(a: Float32Array, b: Float32Array): number {
   return dot;
 }
 
-/** Voyage has no official TypeScript SDK, so this is the REST endpoint. */
+/**
+ * Voyage has no official TypeScript SDK, so this is the REST endpoint.
+ *
+ * The timeout is not optional. `fetch` has no default one, so a stalled
+ * request hangs the process with no error and no output, which is
+ * indistinguishable from a slow embedding job right up until it never ends.
+ */
+const EMBED_TIMEOUT_MS = Number(process.env["EMBED_TIMEOUT_MS"] ?? 60_000);
+
 export function makeVoyageEmbedder(apiKey: string, model = "voyage-3-large"): Embedder {
   return {
     name: model,
@@ -90,6 +98,7 @@ export function makeVoyageEmbedder(apiKey: string, model = "voyage-3-large"): Em
           authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({ model, input: texts, input_type: "document" }),
+        signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
       });
       if (!response.ok) {
         throw new Error(`voyage embeddings failed: ${response.status} ${await response.text()}`);

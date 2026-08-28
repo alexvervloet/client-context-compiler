@@ -26,11 +26,18 @@ export type SearchIndex = {
   embedder: Embedder;
 };
 
-export async function buildIndex(chunks: Chunk[], embedder: Embedder): Promise<SearchIndex> {
+export type IndexProgress = (done: number, total: number) => void;
+
+export async function buildIndex(
+  chunks: Chunk[],
+  embedder: Embedder,
+  onProgress?: IndexProgress,
+): Promise<SearchIndex> {
   const vectors: Float32Array[] = [];
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
     const batch = chunks.slice(i, i + EMBED_BATCH);
     vectors.push(...(await embedder.embed(batch.map((c) => c.text))));
+    onProgress?.(vectors.length, chunks.length);
   }
   return { chunks, vectors, embedder };
 }
