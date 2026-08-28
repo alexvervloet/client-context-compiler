@@ -51,12 +51,23 @@ The advisor asks for meeting prep on the *other* James. The system:
 - ranks the email highly, because it is genuinely about the other James too
 - produces a prep note saying "you have a tuition payment due September 12"
 
-She walks into a room and mentions his daughter's tuition. He has no daughter in
-college. What he has learned is that his business partner is short of cash, from
-his own advisor.
+She walks into a room holding a document that states a $58K obligation her
+client does not have, and plans his cash flow around it.
 
-Nothing was breached. No control failed. The system was working exactly as
-designed and produced a disclosure the firm gets a phone call about.
+Be careful how you tell this one, because the obvious version is wrong and
+somebody sharp will catch it. Whitfield is not learning a secret. He was the
+recipient of that email. The failure is not disclosure, it is **misattribution**:
+the firm has produced and filed a confident, sourced, false statement about a
+client's finances, and the advisor is about to act on it.
+
+Disclosure is the same bug's other outcome. Osei has a planning document about
+funding that tuition which Whitfield has never seen. That one is comparatively
+easy to keep out, because it belongs to Osei alone and can be excluded on
+provenance without reading it. The expensive case is the shared email, where
+both men are legitimately parties and the machine has to work out which of them
+a single sentence is about.
+
+Nothing was breached. No control failed. The system worked exactly as designed.
 
 Why this matters to you as a manager: **your existing risk review will not catch
 this.** It asks about access and encryption and retention. It does not have a
