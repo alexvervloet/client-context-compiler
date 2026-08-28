@@ -43,6 +43,14 @@ packer refuses to emit text that names somebody else, and re-checks the
 assembled window before returning it. If the fence has a hole, the compile
 throws rather than shipping the briefing.
 
+The boundary of that, stated here rather than three hundred lines down: the
+fence recognises clients by name, initials and email address, from a roster.
+It does not recognise "her brother", "the trustee", a name changed by
+marriage, or a misspelling. A passage that reaches another client only by
+those routes gets through, and an independent audit demonstrated it. What
+holds the line underneath is provenance: a record belongs to whoever the
+source system says it belongs to, and no phrasing inside it changes that.
+
 **Says why.** Every candidate appears in the manifest with a verdict: admitted,
 dropped for budget, held back by the fence, refused for authorization. During
 an incident review that is the difference between "the model missed it" and
