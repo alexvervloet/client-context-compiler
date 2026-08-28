@@ -10,7 +10,15 @@ export type ClientId = string;
 export type AdvisorId = string;
 
 /** Systems a wealth-management firm already runs. */
-export type SourceSystem = "crm" | "gmail" | "gcal" | "notes" | "planning" | "firm";
+export type SourceSystem =
+  | "crm"
+  | "gmail"
+  | "gcal"
+  | "notes"
+  | "planning"
+  | "firm"
+  /** A turn from earlier in this session. Cited like anything else. */
+  | "session";
 
 /** A pointer back to the record a claim came from. */
 export type SourceRef = {

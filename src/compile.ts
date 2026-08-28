@@ -17,6 +17,8 @@ import type { Embedder } from "./embed.ts";
 import { buildIndex, search } from "./retrieve.ts";
 import type { SearchIndex } from "./retrieve.ts";
 import { pack } from "./pack.ts";
+import { conversationChunks } from "./session.ts";
+import type { Session } from "./session.ts";
 import type { FencePolicy } from "./fence.ts";
 
 /**
@@ -46,7 +48,12 @@ export type CompilerOptions = {
 };
 
 export type Compiler = {
-  compile(request: CompileRequest): Promise<CompiledContext>;
+  /**
+   * A session is optional. When one is supplied, its turns become the
+   * conversation layer and are fenced exactly like retrieved records: a turn
+   * about another client does not enter this window, whatever it says.
+   */
+  compile(request: CompileRequest, session?: Session): Promise<CompiledContext>;
   readonly index: SearchIndex;
   readonly mentions: MentionIndex;
   readonly embedder: Embedder;
@@ -64,8 +71,14 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
     index,
     mentions,
     embedder,
-    async compile(request) {
+    async compile(request, session) {
       const client = clientById(request.clientId);
+      if (session !== undefined && session.advisorId !== request.advisorId) {
+        throw new Error(
+          `session ${session.id} belongs to ${session.advisorId}, not ${request.advisorId}`,
+        );
+      }
+
       if (client.advisorId !== request.advisorId) {
         // Not a fence problem. This advisor has no business here at all.
         throw new Error(
@@ -85,6 +98,7 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
       return pack({
         request,
         candidates,
+        conversation: session === undefined ? [] : conversationChunks(session, mentions),
         authorized: authorizedFor(request.advisorId),
         index: mentions,
         policy,
