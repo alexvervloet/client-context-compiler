@@ -15,7 +15,7 @@ import { check } from "./harness.ts";
 import { makeCompiler } from "../src/compile.ts";
 import { makeMockEmbedder } from "../src/embed.ts";
 import { newSession, recordTurn } from "../src/session.ts";
-import type { Session } from "../src/session.ts";
+import type { Session, Turn } from "../src/session.ts";
 import { CLIENTS } from "../src/corpus/roster.ts";
 import { TASK_KINDS } from "../src/types.ts";
 
@@ -47,6 +47,26 @@ const PRIOR_ANSWER: Record<string, string> = {
 
 /** The follow-up that names nobody. The one a subject field has to catch. */
 const BLIND_FOLLOWUP = "What about that September obligation? Can we cover it another way?";
+
+/**
+ * A turn recorded as one client's that names another client outright.
+ *
+ * This is the branch the suite used to miss entirely. Every prior answer below
+ * is written in pronouns or the owner's own name, so 108 ordered pairs
+ * exercised one arm of the anchor rule 108 times and never touched its
+ * complement. An advisor asking "how does this compare to Margaret Chen's
+ * allocation?" halfway through Elena's prep produces exactly this shape, and it
+ * used to walk straight into Margaret's next window carrying Elena's numbers.
+ */
+function crossNamingTurn(owner: string, names: string, at: string): Turn {
+  return {
+    id: `${owner}_names_${names}`,
+    role: "assistant",
+    text: `Compared with ${names}: ${PRIOR_ANSWER[owner] ?? "nothing outstanding."}`,
+    clientId: owner,
+    at,
+  };
+}
 
 function sessionAbout(clientId: string, advisorId: string): Session {
   let session = newSession(`sess_${clientId}`, advisorId);
@@ -103,6 +123,14 @@ export function carryoverSuite(): Suite {
 
         for (const next of book) {
           if (next.id === previous.id) continue;
+
+          // The session also contains a turn, still recorded as the previous
+          // client's, that names the incoming one by full name.
+          const withNaming = recordTurn(
+            session,
+            crossNamingTurn(previous.id, `${next.first} ${next.last}`, "2026-08-27T09:06:00Z"),
+          );
+
           const out = await compiler.compile(
             {
               task: "meeting-prep",
@@ -111,7 +139,7 @@ export function carryoverSuite(): Suite {
               budgetTokens: 8000,
               now: NOW,
             },
-            session,
+            withNaming,
           );
 
           const survived = fingerprints(previous.id).filter((f) => out.text.includes(f));
