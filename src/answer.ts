@@ -120,7 +120,7 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
     return mockAnswer(context, route, prompt);
   }
 
-  const client = options.client ?? new Anthropic();
+  const client = options.client ?? new Anthropic({ timeout: REQUEST_TIMEOUT_MS, maxRetries: 1 });
   const stream = client.messages.stream({
     model: route.model,
     max_tokens: 16000,
@@ -148,6 +148,13 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
     isMock: false,
   };
 }
+
+/**
+ * Per-request ceiling, in milliseconds. The SDK default is ten minutes with
+ * two retries, so a wedged request can sit there for half an hour looking
+ * exactly like a slow one. Override with ANSWER_TIMEOUT_MS.
+ */
+const REQUEST_TIMEOUT_MS = Number(process.env["ANSWER_TIMEOUT_MS"] ?? 180_000);
 
 function hasCredentials(): boolean {
   const key = process.env["ANTHROPIC_API_KEY"];
