@@ -379,3 +379,40 @@ for each arm explicitly rather than trusting a large number of generated cases
 to cover both. And when a project's central claim is a safety property, get
 someone who did not build it to attack it, because the author's tests and the
 author's bugs come from the same place.
+
+## The explanation dramatised a trap into the wrong failure mode
+
+**Expected:** writing the flagship trap up for a general audience was a matter
+of retelling what the README already says.
+
+**What happened:** the retelling added a beat the corpus does not support.
+The README says the prep note wrongly reports a tuition obligation, and stops
+there, which is correct. The explanation went further and had Whitfield
+*learning* from the briefing that his partner was short of cash.
+
+He cannot. `t_harbor_point_distribution` has Osei writing directly to
+Whitfield, with the advisor copied, on every message in the thread. Whitfield
+is a named recipient. He knew before the compiler ran.
+
+So the embellishment converted an attribution failure into a disclosure, which
+is the one distinction this repository exists to make. It also picked the
+weaker of the two harms: a firm producing a sourced, confident, false statement
+about a client's own balance sheet, and acting on it, needs no secret to be a
+problem.
+
+The genuine disclosure vector is `plan_osei_education`, owned by Osei alone,
+and it is the easy half. `servesSubject` drops it on provenance before scoring,
+without reading a word of it. The shared thread is the case that needs a fence
+precisely because both men belong on it, and that is what makes it the flagship.
+
+Caught by a reader asking how two people who are described as unrelated come to
+co-own a company. The setup sentence was doing the damage: "unrelated" in the
+README means *not a household*, which is a modelled concept, and it got expanded
+into "do not know each other", which contradicts the LLC and then licensed the
+wrong harm.
+
+**Next time:** an example in prose is a claim about the fixture and has to be
+checked against it like any other. Read the actual records before retelling
+them, and when the project's whole point is a distinction between two failure
+modes, do not let a narrative flourish quietly choose the other one. Vague
+words inherited from a summary ("unrelated") are where the drift starts.
