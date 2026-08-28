@@ -16,7 +16,7 @@
 import type { Suite, CaseResult, Progress } from "./harness.ts";
 import { check } from "./harness.ts";
 import { makeCompiler } from "../src/compile.ts";
-import { answer } from "../src/answer.ts";
+import { answer, NO_SOURCE } from "../src/answer.ts";
 import type { Answer } from "../src/answer.ts";
 import { resolveEmbedder } from "../src/embed.ts";
 import { findMentions } from "../src/mentions.ts";
@@ -116,14 +116,32 @@ export function qualitySuite(): Suite {
           ),
         );
 
-        const uncited = factualSentences(out.text).filter((s) => !s.includes("["));
+        // Two checks, because they fail in opposite directions. The first
+        // catches an assertion with nothing behind it. The second catches the
+        // way a model games the first: marking everything as a gap.
+        const sentences = factualSentences(out.text);
+        const unattributed = sentences.filter(
+          (line) => !line.includes(NO_SOURCE) && !/\[[a-z]+:[a-z-]+\//.test(line),
+        );
         results.push(
           check(
-            `${label}: every factual sentence carries a citation`,
-            uncited.length === 0,
-            uncited.length === 0
+            `${label}: every factual sentence is attributed or marked as a gap`,
+            unattributed.length === 0,
+            unattributed.length === 0
               ? ""
-              : `${uncited.length} uncited, first: ${uncited[0]?.slice(0, 90)}`,
+              : `${unattributed.length} of ${sentences.length} unattributed, ` +
+                `first: ${unattributed[0]?.slice(0, 90)}`,
+          ),
+        );
+
+        const sourced = sentences.filter((line) => /\[[a-z]+:[a-z-]+\//.test(line)).length;
+        const sourcedShare = sentences.length === 0 ? 1 : sourced / sentences.length;
+        results.push(
+          check(
+            `${label}: the answer is mostly sourced, not mostly gaps`,
+            sourcedShare >= 0.5,
+            `only ${sourced} of ${sentences.length} sentences cite a record ` +
+              `(${(sourcedShare * 100).toFixed(0)}%)`,
           ),
         );
 
