@@ -10,7 +10,7 @@
  * depend on picking a pair that happens to collide.
  */
 
-import type { Suite, CaseResult } from "./harness.ts";
+import type { Suite, CaseResult, Progress } from "./harness.ts";
 import { check } from "./harness.ts";
 import { makeCompiler } from "../src/compile.ts";
 import { makeMockEmbedder } from "../src/embed.ts";
@@ -90,12 +90,15 @@ export function carryoverSuite(): Suite {
     purpose:
       "A session turn about one client never enters the next client's window, including turns that name nobody.",
     meaningfulOffline: true,
-    async run() {
+    async run(progress: Progress) {
       const compiler = await makeCompiler({ embedder: makeMockEmbedder() });
       const results: CaseResult[] = [];
       const book = CLIENTS.filter((c) => c.advisorId === "adv_reyes");
 
+      let index = 0;
       for (const previous of book) {
+        index++;
+        progress(`[${index}/${book.length}] sessions about ${previous.id}`);
         const session = sessionAbout(previous.id, "adv_reyes");
 
         for (const next of book) {

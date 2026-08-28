@@ -31,13 +31,17 @@ const suites = [
   qualitySuite(),
 ];
 
+process.stdout.write(
+  live
+    ? "\nRunning with credentials. Live suites make model calls and take minutes.\n\n"
+    : "\nNo credentials found. Live suites will be skipped.\n\n",
+);
+
 const reports = await runSuites(suites, live);
 const { failures, text } = report(reports);
 
 process.stdout.write(`\n${text}\n`);
 if (!live) {
-  process.stdout.write(
-    "\nQuality suites were skipped. Set ANTHROPIC_API_KEY to include them.\n",
-  );
+  process.stdout.write("Set ANTHROPIC_API_KEY to include them.\n");
 }
 process.exit(failures === 0 ? 0 : 1);
