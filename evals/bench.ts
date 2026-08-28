@@ -35,8 +35,10 @@ import { clientById } from "../src/corpus/roster.ts";
 import { TASK_KINDS } from "../src/types.ts";
 import type { TaskKind } from "../src/types.ts";
 import { elapsed, note, withHeartbeat } from "./progress.ts";
-import { ledger, projectWorstCaseUsd } from "../src/spend.ts";
+import { ledger, projectEmbeddingUsd, projectWorstCaseUsd } from "../src/spend.ts";
 import { estimateTokens } from "../src/tokens.ts";
+import { generateCorpus } from "../src/corpus/generate.ts";
+import { normalize } from "../src/normalize.ts";
 import { SYSTEM_PROMPT_SAMPLE } from "../src/answer.ts";
 import { attributionBlocks, unattributedBlocks } from "./attribution.ts";
 import { measureRecall } from "./findings.ts";
@@ -111,18 +113,28 @@ const totalCalls = TASK_KINDS.length * models.length * repeats;
 // prompt is a genuine upper bound on input and needs no index to compute.
 
 const SYSTEM_OVERHEAD = estimateTokens(SYSTEM_PROMPT_SAMPLE);
-let worstCaseUsd = 0;
+let generationUsd = 0;
 for (const task of TASK_KINDS) {
   for (const model of models) {
-    worstCaseUsd +=
+    generationUsd +=
       projectWorstCaseUsd(model, BUDGET + SYSTEM_OVERHEAD, MAX_OUTPUT[task]) * repeats;
   }
 }
 
+// Building the index is a paid call too, and leaving it out of the projection
+// is how the first version of this gate reported a number that was not the
+// cost of the run. Normalizing the corpus is local and free; embedding it is
+// not. A warm cache makes this nothing, but the projection assumes a cold one.
+const corpusTokens = normalize(generateCorpus()).reduce((n, c) => n + c.tokens, 0);
+const embeddingUsd = projectEmbeddingUsd(corpusTokens);
+const worstCaseUsd = generationUsd + embeddingUsd;
+
 note("");
 note(`${totalCalls} calls: ${TASK_KINDS.length} tasks x ${models.length} models x ${repeats}.`);
 note(`models: ${models.join(", ")}`);
-note(`worst case if every call generates to its limit: $${worstCaseUsd.toFixed(2)}`);
+note(`generation, if every call runs to its limit: $${generationUsd.toFixed(2)}`);
+note(`embedding ${corpusTokens} corpus tokens on a cold cache: $${embeddingUsd.toFixed(2)}`);
+note(`worst case total: $${worstCaseUsd.toFixed(2)}`);
 note(`spend cap for this process: $${ledger.capUsd.toFixed(2)} (SPEND_CAP_USD)`);
 note("");
 
