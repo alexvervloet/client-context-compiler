@@ -16,6 +16,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { CompiledContext, TaskKind } from "./types.ts";
 import { CAPABILITIES, routeFor, estimateCostUsd } from "./route.ts";
 import type { Route } from "./route.ts";
+import { ledger, projectWorstCaseUsd } from "./spend.ts";
+import type { Ledger } from "./spend.ts";
+import { estimateTokens } from "./tokens.ts";
 
 const TASK_INSTRUCTIONS: Record<TaskKind, string> = {
   "daily-briefing":
@@ -130,11 +133,12 @@ export function extractCitations(
 export function buildRequestParams(
   route: Route,
   prompt: string,
+  task: TaskKind = "meeting-prep",
 ): Anthropic.MessageCreateParamsStreaming {
   const capabilities = CAPABILITIES[route.model];
   const params: Anthropic.MessageCreateParamsStreaming = {
     model: route.model,
-    max_tokens: MAX_OUTPUT_TOKENS,
+    max_tokens: MAX_OUTPUT_TOKENS[task],
     system: SYSTEM,
     messages: [{ role: "user", content: prompt }],
     stream: true,
@@ -144,7 +148,24 @@ export function buildRequestParams(
   return params;
 }
 
-const MAX_OUTPUT_TOKENS = 16000;
+/**
+ * Output ceiling per task, rather than one generous number for everything.
+ *
+ * These are the deliberately-short-output case: a briefing an advisor reads in
+ * under a minute does not need room for sixteen thousand tokens, and with
+ * adaptive thinking on, every token of headroom is a token the model may spend
+ * thinking and bill as output. A flat 16000 here is what made a twelve-call
+ * bench expensive enough to empty an account.
+ *
+ * They still have to leave room for thinking, so they are not as tight as the
+ * visible output suggests. The spend ledger is the actual backstop.
+ */
+const MAX_OUTPUT_TOKENS: Record<TaskKind, number> = {
+  "daily-briefing": 3000,
+  "meeting-prep": 4000,
+  "post-meeting-followup": 3000,
+  "compliance-review": 5000,
+};
 
 export type AnswerOptions = {
   context: CompiledContext;
@@ -152,6 +173,8 @@ export type AnswerOptions = {
   client?: Anthropic;
   /** Override the router. Used by the model-comparison bench. */
   route?: Route;
+  /** Defaults to the process-wide ledger. Pass one to scope a budget. */
+  ledger?: Ledger;
 };
 
 export async function answer(options: AnswerOptions): Promise<Answer> {
@@ -164,7 +187,20 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
   }
 
   const client = options.client ?? new Anthropic({ timeout: REQUEST_TIMEOUT_MS, maxRetries: 1 });
-  const stream = client.messages.stream(buildRequestParams(route, prompt));
+  const params = buildRequestParams(route, prompt, task);
+
+  // Authorise before spending, not after. The projection is the worst the
+  // request could cost if it generated all the way to max_tokens, so the cap
+  // is a ceiling rather than a guess at a typical call.
+  const budget = options.ledger ?? ledger;
+  const projected = projectWorstCaseUsd(
+    route.model,
+    estimateTokens(prompt) + estimateTokens(SYSTEM),
+    params.max_tokens,
+  );
+  budget.authorize(projected, `${task} on ${route.model}`);
+
+  const stream = client.messages.stream(params);
 
   const message = await stream.finalMessage();
   const text = message.content
@@ -173,6 +209,13 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
     .join("");
 
   const { cited, fabricated } = extractCitations(text, context);
+  const costUsd = estimateCostUsd(
+    route.model,
+    message.usage.input_tokens,
+    message.usage.output_tokens,
+  );
+  budget.record(costUsd);
+
   return {
     text,
     route,
@@ -180,7 +223,7 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
     fabricatedKeys: fabricated,
     inputTokens: message.usage.input_tokens,
     outputTokens: message.usage.output_tokens,
-    costUsd: estimateCostUsd(route.model, message.usage.input_tokens, message.usage.output_tokens),
+    costUsd,
     isMock: false,
   };
 }
