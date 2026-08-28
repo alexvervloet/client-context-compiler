@@ -496,6 +496,16 @@ prose is not, and the mock embedder scores lexical overlap rather than meaning,
 so retrieval quality numbers from a keyless run mean nothing. The leak and
 budget numbers do, since those come from deterministic code.
 
+## A guided tour
+
+[docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) walks one request end to end, in
+execution order, and stops at each place where something surprising happens.
+Every number and window excerpt in it came from a real keyless run, so you can
+follow along with the commands as you read.
+
+Start there if you want to know what the code does. Stay here if you want the
+argument for why it does it that way.
+
 ## Explanations, at five levels
 
 The same system explained to five readers, from a high-school Intro to CS
