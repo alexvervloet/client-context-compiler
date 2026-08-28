@@ -38,6 +38,8 @@ import { elapsed, note, withHeartbeat } from "./progress.ts";
 import { ledger, projectWorstCaseUsd } from "../src/spend.ts";
 import { estimateTokens } from "../src/tokens.ts";
 import { buildPrompt } from "../src/answer.ts";
+import { attributionBlocks, unattributedBlocks } from "./attribution.ts";
+import { measureRecall } from "./findings.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
 const BUDGET = 12000;
@@ -91,15 +93,6 @@ if (!hasKey) {
   process.exit(2);
 }
 
-/** A sentence that asserts something. Headings and bullets markers do not. */
-function factualSentences(text: string): string[] {
-  return text
-    .split(/\n+/)
-    .flatMap((line) => line.split(/(?<=[.?!])\s+/))
-    .map((s) => s.trim())
-    .filter((s) => s.length > 40 && !s.startsWith("#"));
-}
-
 type Row = {
   task: TaskKind;
   model: ModelId;
@@ -110,6 +103,10 @@ type Row = {
   fabricated: number;
   uncited: number;
   foreignRefs: number;
+  /** Findings the window supported and the answer surfaced. */
+  found: number;
+  supported: number;
+  missedLabels: string[];
 };
 
 const benchStartedAt = performance.now();
@@ -202,6 +199,7 @@ for (const task of TASK_KINDS) {
       const foreignRefs = findMentions(out.text, compiler.mentions).filter(
         (m) => !m.candidates.includes(clientId),
       ).length;
+      const recall = measureRecall(task, context.text, out.text);
 
       rows.push({
         task,
@@ -211,8 +209,11 @@ for (const task of TASK_KINDS) {
         outputTokens: out.outputTokens,
         costUsd: out.costUsd,
         fabricated: out.fabricatedKeys.length,
-        uncited: factualSentences(out.text).filter((s) => !s.includes("[")).length,
+        uncited: unattributedBlocks(attributionBlocks(out.text)).length,
         foreignRefs,
+        found: recall.found.length,
+        supported: recall.supported.length,
+        missedLabels: recall.missed.map((f) => f.label),
       });
     }
   }
@@ -238,8 +239,10 @@ say(
 );
 say("other than the one the window was compiled for.");
 say();
-say("| task | model | p50 latency | in | out | cost | fabricated keys | uncited claims | foreign refs |");
-say("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+say(
+  "| task | model | p50 latency | in | out | cost | findings found | fabricated keys | uncited | foreign refs |",
+);
+say("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -254,11 +257,13 @@ for (const task of TASK_KINDS) {
     const group = rows.filter((r) => r.task === task && r.model === model);
     if (group.length === 0) continue;
     const sum = (pick: (r: Row) => number): number => group.reduce((n, r) => n + pick(r), 0);
+    const first = group[0];
     say(
       `| ${task} | ${model} | ${median(group.map((r) => r.ms)).toFixed(0)} ms ` +
         `| ${Math.round(sum((r) => r.inputTokens) / group.length)} ` +
         `| ${Math.round(sum((r) => r.outputTokens) / group.length)} ` +
         `| $${(sum((r) => r.costUsd) / group.length).toFixed(4)} ` +
+        `| ${sum((r) => r.found) / group.length}/${first?.supported ?? 0} ` +
         `| ${sum((r) => r.fabricated)} | ${sum((r) => r.uncited)} | ${sum((r) => r.foreignRefs)} |`,
     );
   }
@@ -277,6 +282,25 @@ for (const model of models) {
 }
 say();
 say(`List prices used: ${models.map((m) => `${m} $${PRICING[m].input}/$${PRICING[m].output}`).join(", ")} per MTok.`);
+say();
+
+say("### What each model missed");
+say();
+say("A finding is only counted when the compiled window actually contained it,");
+say("so a miss here is the model skipping something it was shown, not retrieval");
+say("failing to find it. This is the column that decides whether routing down is");
+say("a saving or a quiet regression: safety numbers stay clean when a model");
+say("simply writes less.");
+say();
+
+const missed = rows.filter((r) => r.missedLabels.length > 0);
+if (missed.length === 0) {
+  say("Nothing. Every model surfaced every supported finding.");
+} else {
+  for (const row of missed) {
+    say(`- **${row.model}** on ${row.task}: ${row.missedLabels.join("; ")}`);
+  }
+}
 say();
 
 const leaks = rows.filter((r) => r.foreignRefs > 0 || r.fabricated > 0);

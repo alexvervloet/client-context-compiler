@@ -16,8 +16,9 @@
 import type { Suite, CaseResult, Progress } from "./harness.ts";
 import { check } from "./harness.ts";
 import { withHeartbeat } from "./progress.ts";
+import { attributionBlocks, CITATION, unattributedBlocks } from "./attribution.ts";
 import { makeCompiler } from "../src/compile.ts";
-import { answer, NO_SOURCE } from "../src/answer.ts";
+import { answer } from "../src/answer.ts";
 import type { Answer } from "../src/answer.ts";
 import { resolveEmbedder } from "../src/embed.ts";
 import { findMentions } from "../src/mentions.ts";
@@ -37,75 +38,6 @@ const LIVE_CASES: Array<{ clientId: string; task: TaskKind }> = [
   { clientId: "cl_chen_margaret", task: "compliance-review" },
   { clientId: "cl_delgado_robert", task: "daily-briefing" },
 ];
-
-/**
- * The unit of attribution: a bullet or a paragraph, not a sentence.
- *
- * Sentence splitting was the wrong unit twice over. It cut inside quoted
- * material, so a briefing quoting a source email ("she wrote \"That is lower
- * than I expected.\"") came apart into an orphaned fragment with no citation,
- * and quoting the source is behaviour worth encouraging. And it demanded a key
- * after every sentence, which is not how cited writing works: a two-sentence
- * point drawn from one record carries one citation at the end of it.
- *
- * Blocks are weaker than sentences, and worth being explicit about. A bullet
- * whose first half came from one record and second half from another passes
- * with only the second cited. Nothing lexical catches that. What does catch
- * the version of it that matters is the foreign-reference check below, which
- * fails if any name in the output resolves to another client.
- */
-export function attributionBlocks(text: string): string[] {
-  const blocks: string[] = [];
-  let current = "";
-
-  const flush = (): void => {
-    if (current !== "") blocks.push(current);
-    current = "";
-  };
-
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.trim();
-    // A line that is nothing but emphasis is a sub-heading written in a
-    // different notation than "#", and a heading asserts nothing.
-    if (line === "" || line.startsWith("#") || BOLD_HEADING.test(line)) {
-      flush();
-      continue;
-    }
-    // A new list item starts a block; anything else continues the current one,
-    // so a wrapped line stays with the citation at the end of its bullet.
-    if (/^([-*\u2022]|\d+[.)])\s/.test(line) && current !== "") flush();
-    current = current === "" ? line : `${current} ${line}`;
-  }
-  flush();
-
-  return blocks.filter((block) => block.length > 40);
-}
-
-export const CITATION = /\[[a-z]+:[a-z-]+\//;
-
-/** A line consisting only of bold or italic text, optionally ending in a colon. */
-const BOLD_HEADING = /^(\*{1,3}|_{1,3})[^*_]+\1:?$/;
-
-/**
- * Blocks that assert something and cite nothing.
- *
- * One exception, and it is deliberately narrow. A line ending in a colon that
- * introduces the block after it is a lead-in, not a claim, but only when that
- * next block is itself attributed. "Three gates apply before the meeting
- * ends:" followed by cited gates is structure. The same line followed by
- * nothing sourced is an assertion wearing a colon, and still fails.
- */
-export function unattributedBlocks(blocks: readonly string[]): string[] {
-  const attributed = (block: string): boolean =>
-    block.includes(NO_SOURCE) || CITATION.test(block);
-
-  return blocks.filter((block, i) => {
-    if (attributed(block)) return false;
-    const next = blocks[i + 1];
-    if (block.endsWith(":") && next !== undefined && attributed(next)) return false;
-    return true;
-  });
-}
 
 export function qualitySuite(): Suite {
   return {

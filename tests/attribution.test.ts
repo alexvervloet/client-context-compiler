@@ -8,7 +8,7 @@
 
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { attributionBlocks, CITATION, unattributedBlocks } from "../evals/quality.ts";
+import { attributionBlocks, CITATION, unattributedBlocks } from "../evals/attribution.ts";
 import { NO_SOURCE } from "../src/answer.ts";
 
 function attributed(text: string): boolean[] {
