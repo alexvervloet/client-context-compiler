@@ -10,7 +10,9 @@
  * produce a table that looks exactly like a real one and means nothing, and
  * that table would end up in a README.
  *
- *   secrun npm run bench
+ * Progress goes to stderr, the table to stdout:
+ *
+ *   secrun npm run --silent bench > bench.md
  *   secrun npm run bench -- --models claude-opus-5,claude-haiku-4-5
  */
 
@@ -24,6 +26,7 @@ import type { ModelId } from "../src/route.ts";
 import { clientById } from "../src/corpus/roster.ts";
 import { TASK_KINDS } from "../src/types.ts";
 import type { TaskKind } from "../src/types.ts";
+import { elapsed, note, withHeartbeat } from "./progress.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
 const BUDGET = 12000;
@@ -89,8 +92,21 @@ type Row = {
   foreignRefs: number;
 };
 
-const compiler = await makeCompiler({ embedder: resolveEmbedder() });
+const benchStartedAt = performance.now();
+const totalCalls = TASK_KINDS.length * models.length * repeats;
+note(`${totalCalls} model calls ahead: ${TASK_KINDS.length} tasks x ${models.length} models x ${repeats}.`);
+note("The markdown table goes to stdout, this commentary to stderr.");
+
+const embedder = resolveEmbedder();
+note(`building the index with ${embedder.name}`);
+const compiler = await makeCompiler({
+  embedder,
+  onIndexProgress: (done, total) => {
+    if (done % 384 === 0 || done === total) note(`  embedded ${done}/${total}`);
+  },
+});
 const rows: Row[] = [];
+let call = 0;
 
 for (const task of TASK_KINDS) {
   const clientId = SUBJECTS[task];
@@ -102,16 +118,25 @@ for (const task of TASK_KINDS) {
     budgetTokens: BUDGET,
     now: NOW,
   });
+  note(`${task} (${clientId}): window is ${context.manifest.usedTokens} tokens`);
 
   for (const model of models) {
     for (let i = 0; i < repeats; i++) {
+      const label = `${task} on ${model}`;
+      note(`[${++call}/${totalCalls}] ${label} ...`);
       const started = performance.now();
-      const out = await answer({
-        context,
-        task,
-        route: { model, effort: "high", rationale: "bench" },
-      });
+      const out = await withHeartbeat(label, note, () =>
+        answer({
+          context,
+          task,
+          route: { model, effort: "high", rationale: "bench" },
+        }),
+      );
       const ms = performance.now() - started;
+      note(
+        `[${call}/${totalCalls}] ${label}: ${(ms / 1000).toFixed(1)}s, ` +
+          `${out.outputTokens} out, $${out.costUsd.toFixed(4)}`,
+      );
 
       const foreignRefs = findMentions(out.text, compiler.mentions).filter(
         (m) => !m.candidates.includes(clientId),
@@ -137,6 +162,8 @@ for (const task of TASK_KINDS) {
 const say = (line = ""): void => {
   process.stdout.write(`${line}\n`);
 };
+
+note(`all ${totalCalls} calls done in ${elapsed(benchStartedAt)}`);
 
 say();
 say("## Model comparison");

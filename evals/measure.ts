@@ -4,7 +4,10 @@
  * Written as a script rather than typed into the README by hand, because a
  * number in a README that nothing regenerates is a number that was true once.
  *
- *   npm run measure > /tmp/numbers.md
+ * Progress goes to stderr, the document to stdout, and `--silent` keeps npm's
+ * own banner out of the file:
+ *
+ *   npm run --silent measure > numbers.md
  */
 
 import { makeCompiler } from "../src/compile.ts";
@@ -16,17 +19,22 @@ import { TASK_KINDS } from "../src/types.ts";
 import type { TaskKind } from "../src/types.ts";
 import type { FencePolicy } from "../src/fence.ts";
 import { measureEstimatorError } from "../src/tokens.ts";
+import { elapsed, note, withHeartbeat } from "./progress.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
 const BUDGETS = [1000, 2000, 4000, 8000, 16000, 32000, 64000];
 
+const startedAt = performance.now();
 const out: string[] = [];
 const say = (line = ""): void => {
   out.push(line);
 };
 
+note("measuring. The markdown goes to stdout, this commentary to stderr.");
+
 // ---------------------------------------------------------------- corpus size
 
+note("generating the corpus and normalizing");
 const corpus = generateCorpus();
 const chunks = normalize(corpus);
 const messages = corpus.threads.reduce((n, t) => n + t.messages.length, 0);
@@ -49,7 +57,14 @@ say();
 
 // -------------------------------------------------------------- budget sweep
 
-const compiler = await makeCompiler({ embedder: makeMockEmbedder() });
+note("building the index for the budget sweep");
+const compiler = await makeCompiler({
+  embedder: makeMockEmbedder(),
+  onIndexProgress: (done, total) => {
+    if (done % 384 === 0 || done === total) note(`  embedded ${done}/${total}`);
+  },
+});
+note("running the budget sweep");
 const SWEEP_CLIENT = "cl_whitfield_james";
 const SWEEP_TASK: TaskKind = "meeting-prep";
 
@@ -97,10 +112,13 @@ say("| --- | ---: | ---: | ---: |");
 const policyTotals: Record<string, { admitted: number; fenced: number }> = {};
 
 for (const policy of ["strict", "redact"] as FencePolicy[]) {
+  note(`fence cost under ${policy}: ${CLIENTS.length} clients x ${TASK_KINDS.length} tasks`);
   const c = await makeCompiler({ embedder: makeMockEmbedder(), policy });
   let admitted = 0;
   let fenced = 0;
+  let done = 0;
   for (const client of CLIENTS) {
+    note(`  [${++done}/${CLIENTS.length}] ${client.id}`);
     for (const task of TASK_KINDS) {
       const compiled = await c.compile({
         task,
@@ -149,7 +167,12 @@ if (!hasKey) {
     .filter((_, i) => i % 17 === 0)
     .slice(0, 60)
     .map((c) => c.text);
-  const error = await measureEstimatorError(samples);
+  note(`measuring the estimator against count_tokens over ${samples.length} chunks`);
+  const error = await withHeartbeat("count_tokens", note, () =>
+    measureEstimatorError(samples, "claude-opus-5", undefined, (done, total) => {
+      if (done % 10 === 0 || done === total) note(`  counted ${done}/${total}`);
+    }),
+  );
   say(`Measured over ${error.samples} chunks against \`count_tokens\`.`);
   say();
   say("| | |");
@@ -161,4 +184,5 @@ if (!hasKey) {
 }
 say();
 
+note(`done in ${elapsed(startedAt)}`);
 process.stdout.write(`${out.join("\n")}\n`);

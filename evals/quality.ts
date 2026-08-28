@@ -15,6 +15,7 @@
 
 import type { Suite, CaseResult, Progress } from "./harness.ts";
 import { check } from "./harness.ts";
+import { withHeartbeat } from "./progress.ts";
 import { makeCompiler } from "../src/compile.ts";
 import { answer, NO_SOURCE } from "../src/answer.ts";
 import type { Answer } from "../src/answer.ts";
@@ -104,27 +105,6 @@ export function unattributedBlocks(blocks: readonly string[]): string[] {
     if (block.endsWith(":") && next !== undefined && attributed(next)) return false;
     return true;
   });
-}
-
-/**
- * Report elapsed time while something slow runs, so a call that is thinking
- * hard is distinguishable from one that is wedged.
- */
-async function withHeartbeat<T>(
-  label: string,
-  progress: Progress,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const started = performance.now();
-  const timer = setInterval(() => {
-    progress(`  ${label}: still waiting, ${((performance.now() - started) / 1000).toFixed(0)}s`);
-  }, 15_000);
-  timer.unref();
-  try {
-    return await fn();
-  } finally {
-    clearInterval(timer);
-  }
 }
 
 export function qualitySuite(): Suite {

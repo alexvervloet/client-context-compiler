@@ -58,8 +58,12 @@ worse than no key: it survives review by looking real.
 ```bash
 npm install
 npm test            # unit tests
-npm run evals       # the gate: 182 checks, no API key needed
+npm run evals       # the gate: 290 checks, no API key needed
 npm run measure     # regenerates every number in this README
+
+# The slow scripts print progress to stderr and their document to stdout,
+# so redirecting gives you a clean file:
+npm run --silent measure > numbers.md
 
 npm run ccc -- clients
 npm run ccc -- compile  cl_whitfield_james meeting-prep --budget 6000

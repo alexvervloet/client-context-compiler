@@ -57,6 +57,7 @@ export async function measureEstimatorError(
   samples: string[],
   model = "claude-opus-5",
   client: Anthropic = new Anthropic(),
+  onProgress?: (done: number, total: number) => void,
 ): Promise<EstimatorError> {
   let sum = 0;
   let maxOver = 0;
@@ -65,12 +66,14 @@ export async function measureEstimatorError(
 
   const envelope = await measureEnvelopeTokens(model, client);
 
+  let seen = 0;
   for (const text of samples) {
     if (text.trim() === "") continue;
     const response = await client.messages.countTokens({
       model,
       messages: [{ role: "user", content: text }],
     });
+    onProgress?.(++seen, samples.length);
     const actual = response.input_tokens - envelope;
     if (actual <= 0) continue;
 
