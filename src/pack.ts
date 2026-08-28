@@ -96,7 +96,19 @@ export function pack(input: PackInput): CompiledContext {
   // each layer that ends up with anything in it. Reserve it before handing
   // shares out, rather than discovering it after the fact.
   const scaffold = scaffoldTokens(request, clientName);
-  const available = Math.max(0, request.budgetTokens - scaffold);
+
+  // A budget smaller than the window's own furniture is not an estimator
+  // problem, and saying so sends the caller hunting a bug that is not there.
+  // The header and layer headings are mandatory; below that, no window exists.
+  if (request.budgetTokens < scaffold) {
+    throw new Error(
+      `a budget of ${request.budgetTokens} tokens is below the ${scaffold} the window ` +
+        "header and layer headings cost before any content. Raise the budget; " +
+        "nothing has drifted.",
+    );
+  }
+
+  const available = request.budgetTokens - scaffold;
   let remaining = available;
 
   for (const layer of FILL_ORDER) {
