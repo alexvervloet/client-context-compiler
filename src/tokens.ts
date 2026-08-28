@@ -107,7 +107,7 @@ export async function measureEstimatorError(
   client: Anthropic = new Anthropic(),
   onProgress?: (done: number, total: number) => void,
 ): Promise<EstimatorError> {
-  const envelope = await measureEnvelopeTokens(model, client);
+  const envelope = await envelopeFor(model, client);
   const rawErrors: number[] = [];
   const shippedErrors: number[] = [];
 
@@ -161,11 +161,27 @@ export async function countTokens(
   model = "claude-opus-5",
   client: Anthropic = new Anthropic(),
 ): Promise<number> {
-  const response = await client.messages.countTokens({
-    model,
-    messages: [{ role: "user", content: text }],
-  });
-  return response.input_tokens - (await measureEnvelopeTokens(model, client));
+  const [response, envelope] = await Promise.all([
+    client.messages.countTokens({ model, messages: [{ role: "user", content: text }] }),
+    envelopeFor(model, client),
+  ]);
+  return response.input_tokens - envelope;
+}
+
+/**
+ * The envelope, measured once per model per process.
+ *
+ * It used to be measured on every call, so `verifyBudget: true` cost two
+ * network round trips per compile rather than the one it advertised.
+ */
+const envelopeCache = new Map<string, Promise<number>>();
+
+function envelopeFor(model: string, client: Anthropic): Promise<number> {
+  const cached = envelopeCache.get(model);
+  if (cached !== undefined) return cached;
+  const measured = measureEnvelopeTokens(model, client);
+  envelopeCache.set(model, measured);
+  return measured;
 }
 
 export async function measureEnvelopeTokens(
@@ -177,5 +193,8 @@ export async function measureEnvelopeTokens(
     model,
     messages: [{ role: "user", content: probe }],
   });
-  return Math.max(0, response.input_tokens - estimateTokens(probe));
+  // rawEstimate, not estimateTokens. The latter applies the safety margin, so
+  // measuring the envelope with it makes the constant used to grade that
+  // margin a function of the margin itself.
+  return Math.max(0, response.input_tokens - rawEstimate(probe));
 }
