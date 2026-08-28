@@ -129,16 +129,20 @@ Meeting prep for James Whitfield, strict fence, mock embeddings.
 
 ## What the fence costs
 
-Every client, every task, 8000-token budget. A held-back passage is one
-retrieval found, the advisor is authorized to read, and the compiler
-refused because it names someone else.
+Every client, every task, at a budget large enough that nothing is dropped
+for space. Measuring this at a tight budget makes the fence look worse as the
+budget shrinks, because the share is taken over admitted passages and those
+fall; the fence itself refuses the same passages either way.
+
+A held-back passage is one retrieval found, the advisor is authorized to
+read, and the compiler refused because it names someone else.
 
 | policy | passages admitted | held by the fence | share held back |
 | --- | ---: | ---: | ---: |
-| strict | 2837 | 132 | 4.4% |
-| redact | 2836 | 124 | 4.2% |
+| strict | 3620 | 132 | 3.5% |
+| redact | 3628 | 124 | 3.3% |
 
-Redaction recovers -1 passages that strict refuses, which is -0.0% more context.
+Redaction admits 8 passages that strict refuses, which is 0.22% more context.
 
 ## Token estimator error
 
