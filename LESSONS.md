@@ -221,3 +221,48 @@ something checks it. If a constant encodes an assumption about a model's
 behaviour, the thing that measures it belongs in the repo next to it, and the
 measurement should say out loud when the assumption is violated rather than
 printing a number and leaving the reader to notice the sign.
+
+## A model's request surface is a capability, not a constant
+
+**Expected:** one request body works everywhere. `answer.ts` sent
+`thinking: {type: "adaptive"}` and `output_config: {effort}` on every call.
+
+**What happened:** `claude-haiku-4-5` returned `400 invalid_request_error:
+adaptive thinking is not supported on this model`. Adaptive thinking and the
+effort parameter arrived with the 4.6 family; older models reject them rather
+than ignoring them.
+
+This surfaced in the bench, which is the only place that names models
+explicitly, and it read like a bench problem. It was not. The router drops to
+Haiku when a window comes back nearly empty, so the live path could build the
+same unsendable request. It had never fired because that route was also broken,
+which is the second half of this entry.
+
+The route now carries the *intent* ("think hard about this one") and a
+capability table decides whether that intent is expressible on the chosen
+model. Asserting the built request per model is a unit test that costs nothing;
+finding out costs a failed request in front of a user.
+
+**Next time:** when adding a model to a routing table, the question is not only
+what it costs and how good it is. It is what request shape it accepts. Write
+the capability row at the same time as the pricing row.
+
+## The guard was on the wrong scope, and hid the rule it sat above
+
+**Expected:** `if (admitted.length === 0) return base;` was protecting a
+division by zero further down.
+
+**What happened:** it was returning early from the entire function, so the
+"this window came back nearly empty, route down" rule beneath it never ran in
+the one case it most obviously applies to: a window with nothing admitted at
+all. The rule had been dead since it was written and nothing noticed, because
+routing has no wrong answer that throws.
+
+Found by a unit test written for something else entirely, asserting that the
+route chosen for a thin window produces a sendable request. It never got as far
+as the request; the route was wrong.
+
+**Next time:** a guard belongs around the expression it protects, not around
+everything after it. And a decision function whose every branch returns
+something plausible needs tests per branch, because there is no failure to
+notice.
