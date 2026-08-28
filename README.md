@@ -163,9 +163,15 @@ conservative, so the real windows are smaller. See the estimator section below
 for how much and why, because the first version of that estimator was wrong in
 the dangerous direction and nobody would have known without measuring it.
 
-The fence holds back 3.6% of what retrieval finds. Not 30%, and not 0.1%. Small
+The fence holds back 3.5% of what retrieval finds. Not 30%, and not 0.1%. Small
 enough that refusing is affordable, large enough that a pipeline without a fence
 is shipping other people's information into roughly one passage in thirty.
+
+That number is measured at a budget large enough that nothing is dropped for
+space, which matters: taken at a tight budget it climbs to 4.4%, not because the
+fence refuses more but because the share is over admitted passages and those
+fall. A metric that moves when the thing it measures did not is worth fixing
+before quoting.
 
 ## Design decisions worth arguing about
 
@@ -221,10 +227,19 @@ wrong ruler and every window was bigger than it claimed. It counted digits at
 the same rate as letters, in a corpus made of dates and dollar amounts.
 
 Digits are now modelled separately and there is an explicit safety margin
-derived from that measurement rather than chosen. `makeCompiler({ verifyBudget:
-true })` additionally checks the finished window against the real tokenizer and
-throws if it does not fit. One network call per compile, off by default, and the
-only thing that turns the budget from a belief into a fact.
+derived from that measurement rather than chosen. Re-measured, the model runs
+2.9% low on average instead of 15.6%, and the shipped estimator undercounts on
+0% of samples, which is the property the budget assertion depends on.
+
+It costs 26.8% on average, and most of that waste is a measurement artefact I
+have not finished fixing. The margin has to cover the worst *chunk* (-21.3%),
+but the budget is a property of the whole *window*, where hundreds of chunk
+errors average out. `npm run measure` now reports window-level error too, and
+that is the number the margin should be set from.
+
+`makeCompiler({ verifyBudget: true })` checks the finished window against the
+real tokenizer and throws if it does not fit. One network call per compile, off
+by default, and the only thing that turns the budget from a belief into a fact.
 
 **Contamination is computed over exactly the text that gets rendered.** Not the
 body without the subject line, not the paragraph without its title. Any gap
@@ -248,9 +263,18 @@ So redaction now only applies where the other client is mentioned in passing in
 a record somebody else owns: an advisor's note about one client that reaches for
 another as a comparison. If the other client is party to the record, both
 policies refuse it. That is a much smaller feature than intended and it is the
-only version that holds up. It recovers 8 passages out of 3,524.
+only version that holds up.
 
-Strict is the default and should stay the default.
+It also does not pay for itself. Unconstrained it admits 8 more passages out of
+3,620, which is 0.22%. At an 8,000-token budget it admits *one fewer* than
+strict, because `[another client]` is 10 estimated tokens and most of the names
+it replaces are six or seven, so a redacted passage costs more than the original
+and crowds another one out.
+
+Strict is the default, and on this evidence it should be the only thing anyone
+turns on. The redact path stays because the eval axis it creates catches
+regressions in the fence, and because the measurement is the point: masking a
+name is not the same as removing the information, and it is not free either.
 
 ## Model routing
 
