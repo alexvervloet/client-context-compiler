@@ -209,7 +209,7 @@ The generated meeting notes are titled `{surname} — meeting notes`, which name
 three siblings and nobody in particular, so the fence cheerfully filed each
 sibling's notes under the others. No name appeared that shouldn't have. What
 leaked was the body of somebody else's note under a title that could have meant
-anyone. [LESSONS.md](LESSONS.md) has the full account.
+anyone. [LESSONS.md](docs/LESSONS.md) has the full account.
 
 **Chunk granularity is a contamination control, not just a retrieval knob.** The
 trust document names three clients. Split into paragraphs, the paragraph about
