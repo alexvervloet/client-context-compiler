@@ -5,10 +5,18 @@
  * index is the expensive half and it does not depend on who is asking.
  */
 
-import type { ClientId, CompileRequest, CompiledContext, TaskKind } from "./types.ts";
+import type {
+  Chunk,
+  ClientId,
+  CompileRequest,
+  CompiledContext,
+  Directory,
+  DirectoryEntry,
+  TaskKind,
+} from "./types.ts";
 import { generateCorpus } from "./corpus/generate.ts";
 import type { Corpus } from "./corpus/shapes.ts";
-import { CLIENTS, clientById } from "./corpus/roster.ts";
+import { CLIENTS } from "./corpus/roster.ts";
 import { normalize } from "./normalize.ts";
 import { buildMentionIndex } from "./mentions.ts";
 import type { MentionIndex } from "./mentions.ts";
@@ -41,6 +49,17 @@ const TASK_QUERIES: Record<TaskKind, string> = {
 };
 
 export type CompilerOptions = {
+  /**
+   * Chunks to serve. Supply these to run against a real firm's data; the
+   * connector is yours, and `normalize` is only one way to produce them.
+   */
+  chunks?: Chunk[];
+  /**
+   * Who the clients are and who advises them. Required alongside `chunks`;
+   * defaults to the synthetic roster otherwise.
+   */
+  directory?: Directory;
+  /** The bundled synthetic firm. Ignored when `chunks` is supplied. */
   corpus?: Corpus;
   embedder?: Embedder;
   policy?: FencePolicy;
@@ -60,19 +79,26 @@ export type Compiler = {
 };
 
 export async function makeCompiler(options: CompilerOptions = {}): Promise<Compiler> {
-  const corpus = options.corpus ?? generateCorpus(options.seed);
-  const mentions = buildMentionIndex();
-  const chunks = normalize(corpus, mentions);
+  const directory: Directory = options.directory ?? { clients: CLIENTS };
+  const mentions = buildMentionIndex(directory.clients);
+  const chunks =
+    options.chunks ?? normalize(options.corpus ?? generateCorpus(options.seed), mentions);
   const embedder = options.embedder ?? resolveEmbedder();
   const index = await buildIndex(chunks, embedder);
   const policy = options.policy ?? "strict";
+
+  const lookup = (clientId: ClientId): DirectoryEntry => {
+    const found = directory.clients.find((c) => c.id === clientId);
+    if (found === undefined) throw new Error(`unknown client: ${clientId}`);
+    return found;
+  };
 
   return {
     index,
     mentions,
     embedder,
     async compile(request, session) {
-      const client = clientById(request.clientId);
+      const client = lookup(request.clientId);
       if (session !== undefined && session.advisorId !== request.advisorId) {
         throw new Error(
           `session ${session.id} belongs to ${session.advisorId}, not ${request.advisorId}`,
@@ -99,7 +125,7 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
         request,
         candidates,
         conversation: session === undefined ? [] : conversationChunks(session, mentions),
-        authorized: authorizedFor(request.advisorId),
+        authorized: authorizedFor(request.advisorId, directory),
         index: mentions,
         policy,
         clientName: `${client.first} ${client.last}`,
@@ -109,6 +135,11 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
 }
 
 /** Every client on an advisor's book. */
-export function authorizedFor(advisorId: string): ReadonlySet<ClientId> {
-  return new Set(CLIENTS.filter((c) => c.advisorId === advisorId).map((c) => c.id));
+export function authorizedFor(
+  advisorId: string,
+  directory: Directory = { clients: CLIENTS },
+): ReadonlySet<ClientId> {
+  return new Set(
+    directory.clients.filter((c) => c.advisorId === advisorId).map((c) => c.id),
+  );
 }

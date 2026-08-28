@@ -111,6 +111,25 @@ export const TASK_KINDS: readonly TaskKind[] = [
   "compliance-review",
 ];
 
+/**
+ * The minimum a caller has to tell us about a client for any of this to work:
+ * enough to recognise their name in prose, and who is allowed to see them.
+ *
+ * Deliberately small. A firm's real client record has a hundred fields and
+ * none of the rest are this library's business.
+ */
+export type DirectoryEntry = {
+  id: ClientId;
+  first: string;
+  last: string;
+  email: string;
+  advisorId: AdvisorId;
+};
+
+export type Directory = {
+  clients: readonly DirectoryEntry[];
+};
+
 export type Advisor = {
   id: AdvisorId;
   name: string;

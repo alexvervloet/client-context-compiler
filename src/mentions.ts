@@ -13,9 +13,8 @@
  * asserting one spouse's holdings as the other's.
  */
 
-import type { ClientId, Mention } from "./types.ts";
+import type { ClientId, DirectoryEntry, Mention } from "./types.ts";
 import { CLIENTS } from "./corpus/roster.ts";
-import type { ClientSeed } from "./corpus/roster.ts";
 
 export type MentionIndex = {
   /** Surface forms, longest first, each mapped to the clients it can mean. */
@@ -30,7 +29,9 @@ function addForm(into: Map<string, Set<ClientId>>, form: string, client: ClientI
   else existing.add(client);
 }
 
-export function buildMentionIndex(clients: readonly ClientSeed[] = CLIENTS): MentionIndex {
+export function buildMentionIndex(
+  clients: readonly DirectoryEntry[] = CLIENTS,
+): MentionIndex {
   const collected = new Map<string, Set<ClientId>>();
   const byEmail = new Map<string, ClientId>();
 
