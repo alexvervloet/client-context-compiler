@@ -14,7 +14,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { CompiledContext, TaskKind } from "./types.ts";
-import { routeFor, estimateCostUsd } from "./route.ts";
+import { CAPABILITIES, routeFor, estimateCostUsd } from "./route.ts";
 import type { Route } from "./route.ts";
 
 const TASK_INSTRUCTIONS: Record<TaskKind, string> = {
@@ -118,6 +118,34 @@ export function extractCitations(
   return { cited: [...cited].sort(), fabricated: [...fabricated].sort() };
 }
 
+/**
+ * The request body, shaped for the model that will receive it.
+ *
+ * A route carries the *intent* ("think hard about this one"). Whether that
+ * intent is expressible depends on the model: adaptive thinking and
+ * `output_config.effort` arrived with the 4.6 family, and Haiku 4.5 returns a
+ * 400 rather than ignoring them. Exported so this can be asserted without
+ * spending a request to find out.
+ */
+export function buildRequestParams(
+  route: Route,
+  prompt: string,
+): Anthropic.MessageCreateParamsStreaming {
+  const capabilities = CAPABILITIES[route.model];
+  const params: Anthropic.MessageCreateParamsStreaming = {
+    model: route.model,
+    max_tokens: MAX_OUTPUT_TOKENS,
+    system: SYSTEM,
+    messages: [{ role: "user", content: prompt }],
+    stream: true,
+  };
+  if (capabilities.adaptiveThinking) params.thinking = { type: "adaptive" };
+  if (capabilities.effort) params.output_config = { effort: route.effort };
+  return params;
+}
+
+const MAX_OUTPUT_TOKENS = 16000;
+
 export type AnswerOptions = {
   context: CompiledContext;
   task: TaskKind;
@@ -136,14 +164,7 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
   }
 
   const client = options.client ?? new Anthropic({ timeout: REQUEST_TIMEOUT_MS, maxRetries: 1 });
-  const stream = client.messages.stream({
-    model: route.model,
-    max_tokens: 16000,
-    system: SYSTEM,
-    thinking: { type: "adaptive" },
-    output_config: { effort: route.effort },
-    messages: [{ role: "user", content: prompt }],
-  });
+  const stream = client.messages.stream(buildRequestParams(route, prompt));
 
   const message = await stream.finalMessage();
   const text = message.content
