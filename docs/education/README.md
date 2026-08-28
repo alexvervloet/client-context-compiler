@@ -24,8 +24,8 @@ window, and everything does not fit. This project decides what goes in: it packs
 firm knowledge, one client's history, and the current conversation under a token
 budget, and it refuses to admit any text that names a different client. That
 refusal is the point. The advisor is *authorized* to read both clients' files,
-so no permission check catches the case where one client's private detail rides
-into the other's briefing on a document that legitimately mentions both.
+so no permission check catches the case where a document legitimately mentions
+both and the briefing reports one man's obligation as the other's.
 
 ## Where to start
 
