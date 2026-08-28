@@ -155,3 +155,38 @@ network paths have finite timeouts.
 slow, and the failure mode is a bug report about a hang that is not a hang.
 If a step can take minutes, it has to say something while it does. And a
 network call without an explicit timeout is a hang waiting for a bad day.
+
+## Three rounds of eval fixes, zero model findings, and what that told me
+
+**Expected:** the grounding check would find the model asserting things the
+window did not support.
+
+**What happened:** it found my parser, three times running. First it flagged
+metadata lines and statements of absence. Then it split inside quotations and
+demanded a citation after every sentence, which is not how cited writing works.
+Then it flagged a bold-only sub-heading and a list lead-in ending in a colon.
+
+Every failure was a formatting artifact. The model never once asserted
+something it could not cite.
+
+Meanwhile the other checks in the same suite passed on the first live run and
+have not been touched since: no fabricated citation key, no name resolving to
+another client, no other client named, the forged instruction not obeyed. The
+difference is not that those are easier. It is that they look for exact
+strings. A key either exists in the manifest or it does not. A name either
+resolves to another client or it does not. Neither asks a regular expression to
+understand prose.
+
+The attribution-coverage check asks exactly that, and it will keep needing
+maintenance for as long as the model is free to choose its own markdown.
+
+**Next time:** when writing an eval over free-form output, sort the checks into
+ones that compare against a known set and ones that parse the output's shape.
+The first kind is worth gating on and mostly writes itself. The second kind is
+worth having and will cost maintenance forever, so give it its own tests from
+the start rather than after three rounds of false failures, and expect its
+failures to be about formatting until proven otherwise.
+
+It did earn its keep once: it caught the model opening every briefing with a
+preamble restating when the context was compiled. That was a real product
+problem, fixed in the prompt rather than in the eval.
