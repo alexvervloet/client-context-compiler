@@ -266,3 +266,41 @@ as the request; the route was wrong.
 everything after it. And a decision function whose every branch returns
 something plausible needs tests per branch, because there is no failure to
 notice.
+
+## I shipped a cost-aware router with no cost control in it
+
+**Expected:** the routing table balances quality against cost, so cost is
+handled.
+
+**What happened:** a bench made twelve calls across three models with `effort`
+forced to high, `max_tokens` of 16000, and adaptive thinking on, which bills
+reasoning as output at the output rate. Projected worst case, computed
+afterwards: $2.89 per run. Nothing in the code was counting, so nothing
+objected. The first thing that did was the account running out of credit,
+mid-stream, on someone else's balance.
+
+Three separate mistakes stacked:
+
+The defaults routed to Opus everywhere, justified as "routing down must earn
+itself against a measured quality number". Routing *up* was not held to that
+standard. With the bench unrun, Opus everywhere was exactly as unmeasured, and
+it was the expensive kind. Cost is knowable before you spend it; quality is not.
+
+The bench then overrode the router's own effort setting to `high` for every
+model, so even the rows the router would have run cheaply ran expensively.
+
+And `max_tokens` was a flat 16000 for every task, including a daily briefing
+meant to be read in under a minute. With adaptive thinking on, headroom is not
+free: it is room to think, billed as output.
+
+The galling part is that the fence, the audit trail and the manifest in this
+repository are all patterns carried over from an earlier project of mine. That
+project has a spend ledger with a per-org daily budget that blocks the model
+call before it happens. I carried over the parts I found interesting and left
+behind the one that stops a bill.
+
+**Next time:** a script that spends money defaults to telling you what it would
+spend. Authorise before the call using the worst case the request permits, not
+after it using what it actually cost, because after is accounting and before is
+a control. And when a task is "make something expensive measurable", the
+measurement harness is the first thing that needs the limit, not the last.

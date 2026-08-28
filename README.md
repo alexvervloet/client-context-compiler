@@ -286,20 +286,54 @@ is short.
 
 | task | model | effort | why |
 | --- | --- | --- | --- |
-| daily briefing | Sonnet 5 | medium | one per client per morning, and a person reads it before acting |
-| meeting prep | Opus 5 | high | the advisor walks into a room holding this |
-| post-meeting follow-up | Sonnet 5 | medium | summarising what was just agreed |
-| compliance review | Opus 5 | xhigh | audited, and a wrong answer is a finding |
+| daily briefing | Haiku 4.5 | low | one per client per morning, and a person reads it before acting |
+| meeting prep | Sonnet 5 | medium | the advisor walks into a room holding this, so a tier above a briefing |
+| post-meeting follow-up | Haiku 4.5 | low | summarising what was just agreed, with the note already in context |
+| compliance review | Sonnet 5 | high | audited, and the most likely row to move up once the bench has run |
 
-Everything defaults to Opus. Routing down is a decision that has to earn itself
-against a measured quality number, which is what the eval suite is for. Routing
-down on a hunch is how a compliance review quietly gets worse.
+Escalation moves one tier, never straight to the top.
 
-The rationales above are currently opinions. `npm run bench` turns them into a
-table: latency, cost, fabricated keys, uncited claims and foreign references per
-task per model, over identical compiled windows so the model is the only
-variable. It needs credentials and refuses to run without them, because a model
-comparison assembled from stub output looks exactly like a real one.
+These defaults used to be Opus everywhere, justified as "routing down has to
+earn itself against a measured quality number". The flaw is that routing *up*
+was not held to the same standard. With the bench unrun, Opus everywhere was
+equally unmeasured, and it was the expensive kind of unmeasured. Cost is known
+in advance; quality is not. Defaulting to the known-cheap option while the
+quality question is open is the reversible choice, and the table is provisional
+until the bench has run.
+
+## What a run costs, before you run it
+
+`npm run bench` is a dry run. It prints the projected worst case and exits:
+
+```
+8 calls: 4 tasks x 2 models x 1.
+models: claude-haiku-4-5, claude-sonnet-5
+worst case if every call generates to its limit: $0.35
+spend cap for this process: $0.50 (SPEND_CAP_USD)
+
+Dry run. Nothing has been spent and nothing will be.
+```
+
+It spends nothing until `--confirm`, refuses to start if the projection is above
+the cap, and Opus is opt-in rather than included.
+
+That is not how it started. The first version made twelve calls across all three
+models with `effort` forced to high and `max_tokens` of 16000, and adaptive
+thinking bills its reasoning as output. Projected worst case: **$2.89 a run**,
+with nothing anywhere counting. The thing that eventually objected was an
+account running out of credit.
+
+Every call now goes through a ledger that authorises *before* the request, using
+the worst the request could cost rather than a guess at a typical one, so
+`SPEND_CAP_USD` is a ceiling and not a report. Output ceilings are per task: a
+briefing read in under a minute does not need room for sixteen thousand tokens,
+and with adaptive thinking on, every token of headroom is a token that can be
+spent thinking. Same eight calls, same coverage, $0.35.
+
+This is the part of the project I got most wrong, and it is worth saying where:
+the repository already carried a fence, an audit trail and a manifest borrowed
+from a previous project, and left behind the spend ledger from that same
+project, in a repository whose stated purpose includes balancing cost.
 
 ## Evals
 
