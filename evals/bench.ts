@@ -40,6 +40,7 @@ import { estimateTokens } from "../src/tokens.ts";
 import { SYSTEM_PROMPT_SAMPLE } from "../src/answer.ts";
 import { attributionBlocks, unattributedBlocks } from "./attribution.ts";
 import { measureRecall } from "./findings.ts";
+import { leakedMarkers } from "./markers.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
 const BUDGET = 12000;
@@ -88,6 +89,8 @@ type Row = {
   fabricated: number;
   uncited: number;
   foreignRefs: number;
+  /** Another client's private facts in the output, named or not. */
+  leakedDetails: string[];
   /** Findings the window supported and the answer surfaced. */
   found: number;
   supported: number;
@@ -217,6 +220,10 @@ for (const task of TASK_KINDS) {
         (m) => !m.candidates.includes(clientId),
       ).length;
       const recall = measureRecall(task, context.text, out.text);
+      // The name check cannot see the failure this project is about: "you have
+      // a tuition payment due September 12" names nobody and scores zero
+      // foreign references. This looks for the fact instead.
+      const leaked = leakedMarkers(clientId, out.text);
 
       rows.push({
         task,
@@ -228,6 +235,7 @@ for (const task of TASK_KINDS) {
         fabricated: out.fabricatedKeys.length,
         uncited: unattributedBlocks(attributionBlocks(out.text)).length,
         foreignRefs,
+        leakedDetails: leaked.map(([owner, marker]) => `${owner}: "${marker}"`),
         found: recall.found.length,
         supported: recall.supported.length,
         missedLabels: recall.missed.map((f) => f.label),
@@ -257,9 +265,9 @@ say(
 say("other than the one the window was compiled for.");
 say();
 say(
-  "| task | model | p50 latency | in | out | cost | findings found | fabricated keys | uncited | foreign refs |",
+  "| task | model | p50 latency | in | out | cost | findings found | fabricated | uncited | foreign names | leaked facts |",
 );
-say("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+say("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -281,7 +289,8 @@ for (const task of TASK_KINDS) {
         `| ${Math.round(sum((r) => r.outputTokens) / group.length)} ` +
         `| $${(sum((r) => r.costUsd) / group.length).toFixed(4)} ` +
         `| ${sum((r) => r.found) / group.length}/${first?.supported ?? 0} ` +
-        `| ${sum((r) => r.fabricated)} | ${sum((r) => r.uncited)} | ${sum((r) => r.foreignRefs)} |`,
+        `| ${sum((r) => r.fabricated)} | ${sum((r) => r.uncited)} ` +
+        `| ${sum((r) => r.foreignRefs)} | ${sum((r) => r.leakedDetails.length)} |`,
     );
   }
 }
@@ -320,14 +329,20 @@ if (missed.length === 0) {
 }
 say();
 
-const leaks = rows.filter((r) => r.foreignRefs > 0 || r.fabricated > 0);
+const leaks = rows.filter(
+  (r) => r.foreignRefs > 0 || r.fabricated > 0 || r.leakedDetails.length > 0,
+);
 if (leaks.length > 0) {
   say("### Failures worth reading before quoting any of the above");
   say();
   for (const row of leaks) {
     say(
-      `- ${row.model} on ${row.task}: ${row.foreignRefs} foreign reference(s), ` +
-        `${row.fabricated} fabricated key(s).`,
+      `- ${row.model} on ${row.task}: ${row.foreignRefs} foreign name(s), ` +
+        `${row.fabricated} fabricated key(s)` +
+        (row.leakedDetails.length > 0
+          ? `, and another client's private facts: ${row.leakedDetails.join("; ")}`
+          : "") +
+        ".",
     );
   }
   say();
