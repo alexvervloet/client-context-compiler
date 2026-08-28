@@ -175,12 +175,43 @@ if (!hasKey) {
   );
   say(`Measured over ${error.samples} chunks against \`count_tokens\`.`);
   say();
-  say("| | |");
-  say("| --- | ---: |");
-  say(`| mean relative error | ${(error.meanRelative * 100).toFixed(1)}% |`);
-  say(`| worst overcount | ${(error.maxOver * 100).toFixed(1)}% |`);
-  say(`| worst undercount | ${(error.maxUnder * 100).toFixed(1)}% |`);
-  say(`| share of chunks undercounted | ${(error.undercountRate * 100).toFixed(1)}% |`);
+  say("`raw` is the model on its own. `shipped` is what `estimateTokens`");
+  say("returns, safety margin included, and is the one that has to stay");
+  say("positive: a window is only inside its budget if the ruler overcounts.");
+  say();
+  say("| | raw model | shipped |");
+  say("| --- | ---: | ---: |");
+  say(
+    `| mean relative error | ${(error.raw.meanRelative * 100).toFixed(1)}% ` +
+      `| ${(error.shipped.meanRelative * 100).toFixed(1)}% |`,
+  );
+  say(
+    `| worst overcount | ${(error.raw.maxOver * 100).toFixed(1)}% ` +
+      `| ${(error.shipped.maxOver * 100).toFixed(1)}% |`,
+  );
+  say(
+    `| worst undercount | ${(error.raw.maxUnder * 100).toFixed(1)}% ` +
+      `| ${(error.shipped.maxUnder * 100).toFixed(1)}% |`,
+  );
+  say(
+    `| share undercounted | ${(error.raw.undercountRate * 100).toFixed(1)}% ` +
+      `| ${(error.shipped.undercountRate * 100).toFixed(1)}% |`,
+  );
+  say();
+  if (error.shipped.undercountRate > 0) {
+    say(
+      `**The shipped estimator undercounted ${(error.shipped.undercountRate * 100).toFixed(0)}% ` +
+        `of samples, worst case ${(error.shipped.maxUnder * 100).toFixed(1)}%.** ` +
+        "The budget assertion in pack.ts is measuring with the wrong ruler. " +
+        "Raise TOKEN_SAFETY_MARGIN in src/tokens.ts until this row reads 0%.",
+    );
+  } else {
+    say(
+      `The shipped estimator never undercounted. It overcounts by ` +
+        `${(error.shipped.meanRelative * 100).toFixed(1)}% on average, which is ` +
+        "budget spent on nothing and the price of the guarantee holding.",
+    );
+  }
 }
 say();
 
