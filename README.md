@@ -119,13 +119,13 @@ Meeting prep for James Whitfield, strict fence, mock embeddings.
 
 | budget | used | fill | passages admitted | dropped for budget | held by the fence |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1000 | 975 | 98% | 9 | 67 | 6 |
-| 2000 | 1953 | 98% | 20 | 56 | 6 |
-| 4000 | 3921 | 98% | 42 | 34 | 6 |
-| 8000 | 6807 | 85% | 76 | 0 | 6 |
-| 16000 | 6807 | 43% | 76 | 0 | 6 |
-| 32000 | 6807 | 21% | 76 | 0 | 6 |
-| 64000 | 6807 | 11% | 76 | 0 | 6 |
+| 1000 | 934 | 93% | 5 | 71 | 6 |
+| 2000 | 1960 | 98% | 13 | 63 | 6 |
+| 4000 | 3886 | 97% | 27 | 49 | 6 |
+| 8000 | 7881 | 99% | 57 | 19 | 6 |
+| 16000 | 10220 | 64% | 76 | 0 | 6 |
+| 32000 | 10220 | 32% | 76 | 0 | 6 |
+| 64000 | 10220 | 16% | 76 | 0 | 6 |
 
 ## What the fence costs
 
@@ -135,10 +135,10 @@ refused because it names someone else.
 
 | policy | passages admitted | held by the fence | share held back |
 | --- | ---: | ---: | ---: |
-| strict | 3524 | 132 | 3.6% |
-| redact | 3532 | 124 | 3.4% |
+| strict | 2837 | 132 | 4.4% |
+| redact | 2836 | 124 | 4.2% |
 
-Redaction recovers 8 passages that strict refuses, which is 0.2% more context.
+Redaction recovers -1 passages that strict refuses, which is -0.0% more context.
 
 ## Token estimator error
 
@@ -150,13 +150,18 @@ with a key, and the number below should not be quoted from a mock run.
 
 Two things in the sweep table are worth more than the rest.
 
-Past 8,000 tokens the window stops growing. It saturates at 6,807 and stays
-there whether the budget is 8k or 64k, because by then retrieval has returned
+Past 16,000 tokens the window stops growing. It saturates at 10,220 and stays
+there whether the budget is 16k or 64k, because by then retrieval has returned
 everything that passes the client filter. The binding constraint moved from the
-budget to the retriever, and eight times the context window bought nothing. That
+budget to the retriever, and four times the context window bought nothing. That
 is the concrete version of "just add more context isn't always the answer": at
 some point you are not short of room, you are short of candidates, and the fix
 is upstream.
+
+Those token figures are the local estimator's, and it is deliberately
+conservative, so the real windows are smaller. See the estimator section below
+for how much and why, because the first version of that estimator was wrong in
+the dangerous direction and nobody would have known without measuring it.
 
 The fence holds back 3.6% of what retrieval finds. Not 30%, and not 0.1%. Small
 enough that refusing is affordable, large enough that a pipeline without a fence
@@ -206,6 +211,20 @@ to emit, citation line and blank lines included, and throws if the finished
 window exceeds its budget. Costing the bare chunk and rendering something larger
 is how a window overflows a budget it was told to respect, which it did here,
 by 5%, until it was fixed.
+
+**The ruler is checked against the tokenizer, not assumed.** Packing runs on a
+local estimate because a network round trip per candidate is not an option. That
+estimate was written with a comment saying it was biased to overcount, and it
+was not: measured against `count_tokens` it ran 15.6% low on average and low on
+every single sample, which meant the budget assertion was comparing against the
+wrong ruler and every window was bigger than it claimed. It counted digits at
+the same rate as letters, in a corpus made of dates and dollar amounts.
+
+Digits are now modelled separately and there is an explicit safety margin
+derived from that measurement rather than chosen. `makeCompiler({ verifyBudget:
+true })` additionally checks the finished window against the real tokenizer and
+throws if it does not fit. One network call per compile, off by default, and the
+only thing that turns the budget from a belief into a fact.
 
 **Contamination is computed over exactly the text that gets rendered.** Not the
 body without the subject line, not the paragraph without its title. Any gap
