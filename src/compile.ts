@@ -25,6 +25,7 @@ import type { Embedder } from "./embed.ts";
 import { buildIndex, search } from "./retrieve.ts";
 import type { IndexProgress, SearchIndex } from "./retrieve.ts";
 import { pack } from "./pack.ts";
+import { countTokens } from "./tokens.ts";
 import { conversationChunks } from "./session.ts";
 import type { Session } from "./session.ts";
 import type { FencePolicy } from "./fence.ts";
@@ -66,6 +67,14 @@ export type CompilerOptions = {
   seed?: number;
   /** Called after each embedding batch. Real embedders take a while. */
   onIndexProgress?: IndexProgress;
+  /**
+   * Check the finished window against the real tokenizer instead of trusting
+   * the local estimate. One extra network call per compile, and the only thing
+   * that turns the budget from a belief into a fact. Off by default because
+   * that call is on the request path; worth turning on in staging, in a
+   * canary, or anywhere a window is close to its ceiling.
+   */
+  verifyBudget?: boolean;
 };
 
 export type Compiler = {
@@ -123,7 +132,7 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
         topK: 120,
       });
 
-      return pack({
+      const compiled = pack({
         request,
         candidates,
         conversation: session === undefined ? [] : conversationChunks(session, mentions),
@@ -132,6 +141,19 @@ export async function makeCompiler(options: CompilerOptions = {}): Promise<Compi
         policy,
         clientName: `${client.first} ${client.last}`,
       });
+
+      if (options.verifyBudget === true) {
+        const actual = await countTokens(compiled.text);
+        if (actual > request.budgetTokens) {
+          throw new Error(
+            `window is ${actual} real tokens against a budget of ${request.budgetTokens}. ` +
+              `The estimator said ${compiled.manifest.usedTokens}, so it is running low. ` +
+              "Raise TOKEN_SAFETY_MARGIN and re-run npm run measure.",
+          );
+        }
+      }
+
+      return compiled;
     },
   };
 }
