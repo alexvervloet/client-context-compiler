@@ -8,7 +8,7 @@
 
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { attributionBlocks, CITATION } from "../evals/quality.ts";
+import { attributionBlocks, CITATION, unattributedBlocks } from "../evals/quality.ts";
 import { NO_SOURCE } from "../src/answer.ts";
 
 function attributed(text: string): boolean[] {
@@ -79,4 +79,56 @@ test("headings are not claims and do not need citing", () => {
 
 test("a line too short to be a claim is not counted", () => {
   assert.deepEqual(attributionBlocks("Two open items."), []);
+});
+
+test("a bold-only line is a sub-heading, not a claim", () => {
+  const text = [
+    "**Recommendation conflicting with the rating**",
+    "",
+    "The 2024 note recommends an aggressive allocation [notes:meeting-note/n1].",
+  ].join("\n");
+  const blocks = attributionBlocks(text);
+  assert.equal(blocks.length, 1);
+  assert.deepEqual(unattributedBlocks(blocks), []);
+});
+
+test("a lead-in ending in a colon is excused when what follows is cited", () => {
+  const blocks = attributionBlocks(
+    [
+      "If Riverside is discussed as more than information, three gates apply first:",
+      "",
+      "- The parcel is off-shelf and needs desk approval [firm:product/firm_product_shelf#2].",
+    ].join("\n"),
+  );
+  assert.equal(blocks.length, 2);
+  assert.deepEqual(unattributedBlocks(blocks), []);
+});
+
+test("a colon does not excuse a lead-in when nothing after it is cited", () => {
+  const blocks = attributionBlocks(
+    [
+      "The client has decided to move the whole position before year end, because:",
+      "",
+      "- She is uncomfortable with the current concentration in the account.",
+    ].join("\n"),
+  );
+  assert.equal(unattributedBlocks(blocks).length, 2, "both blocks assert and neither cites");
+});
+
+test("a colon at the end of the answer excuses nothing", () => {
+  const blocks = attributionBlocks(
+    "The following items are outstanding and need the advisor's attention today:",
+  );
+  assert.equal(unattributedBlocks(blocks).length, 1);
+});
+
+test("an uncited claim between two cited ones is still caught", () => {
+  const blocks = attributionBlocks(
+    [
+      "- Distribution timing is unresolved [gcal:event/ev_hp].",
+      "- She has agreed to sell the whole position before the end of the year.",
+      "- KYC review falls due on 2026-09-30 [crm:contact/8812].",
+    ].join("\n"),
+  );
+  assert.equal(unattributedBlocks(blocks).length, 1);
 });
