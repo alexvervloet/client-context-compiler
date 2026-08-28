@@ -2,9 +2,13 @@
  * Which model handles which request.
  *
  * The interesting input is not the task name, it is the manifest. A window
- * full of redactions and ambiguous references is a harder reasoning problem
- * than a clean one, whatever the task was called, and the routing table can
- * see that before the model does.
+ * full of masked names is a harder attribution problem than a clean one,
+ * whatever the task was called, and the routing table can see that before the
+ * model does.
+ *
+ * Only redactions are read. Ambiguous references would be the other half of
+ * that signal and the manifest does not record them, so the comment used to
+ * describe an input that did not exist.
  *
  * The defaults are the cheap tier, and that is a deliberate reversal.
  *
@@ -63,10 +67,7 @@ export type Route = {
   rationale: string;
 };
 
-/**
- * The base table. Volume work goes to Sonnet; anything that ends up in a
- * compliance file goes to Opus and stays there.
- */
+/** The base table. See the file header for why these are the cheap tier. */
 const BASE: Record<TaskKind, Route> = {
   "daily-briefing": {
     model: "claude-haiku-4-5",

@@ -39,8 +39,8 @@ export type CacheStats = { hits: number; misses: number };
 /**
  * Wrap an embedder so identical text is embedded once.
  *
- * Writes on process exit rather than per batch, so a run that dies halfway
- * still keeps what it paid for.
+ * Writes after each batch and again on exit, so a run that dies halfway still
+ * keeps what it paid for.
  */
 export function withDiskCache(
   embedder: Embedder,
