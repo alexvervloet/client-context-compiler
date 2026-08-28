@@ -24,6 +24,28 @@ export const PRICING: Record<ModelId, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
 };
 
+/**
+ * What each model's request surface actually accepts.
+ *
+ * Adaptive thinking and `output_config.effort` arrived with the 4.6 family.
+ * Sending either to Haiku 4.5 is a 400, not a silently ignored field, so the
+ * request has to be shaped per model. Routing owns this because routing is
+ * already the thing that knows which models exist.
+ */
+export type ModelCapabilities = {
+  /** `thinking: { type: "adaptive" }`. */
+  adaptiveThinking: boolean;
+  /** `output_config: { effort }`. */
+  effort: boolean;
+};
+
+export const CAPABILITIES: Record<ModelId, ModelCapabilities> = {
+  "claude-opus-5": { adaptiveThinking: true, effort: true },
+  "claude-sonnet-5": { adaptiveThinking: true, effort: true },
+  // Predates both. Sending either returns 400 invalid_request_error.
+  "claude-haiku-4-5": { adaptiveThinking: false, effort: false },
+};
+
 export type Route = {
   model: ModelId;
   effort: Effort;
@@ -65,7 +87,22 @@ export function routeFor(task: TaskKind, manifest?: Manifest): Route {
   const base = BASE[task];
   if (manifest === undefined) return base;
 
+  // Emptiness first, and it wins. A bigger model will not invent the records
+  // retrieval did not find, so a thin window routes down however many of its
+  // few passages carry caveats. Checked before the escalation below because an
+  // almost-empty window trivially has a high share of anything.
+  if (manifest.usedTokens < manifest.budgetTokens * 0.1) {
+    return {
+      model: "claude-haiku-4-5",
+      effort: "low",
+      rationale:
+        "the window is nearly empty; the honest output is short and a larger model cannot fix retrieval",
+    };
+  }
+
   const admitted = manifest.entries.filter((e) => e.admitted);
+  // Guard the division, not the whole function. Returning `base` here was
+  // skipping the emptiness check above in exactly the emptiest case there is.
   if (admitted.length === 0) return base;
 
   const redacted = admitted.filter(
@@ -78,17 +115,6 @@ export function routeFor(task: TaskKind, manifest?: Manifest): Route {
       model: "claude-opus-5",
       effort: "high",
       rationale: `${(share * 100).toFixed(0)}% of admitted passages carry a masked name, which is a harder attribution problem than this task usually is`,
-    };
-  }
-
-  // A window that came back nearly empty is a different failure. A bigger
-  // model will not invent the records that retrieval did not find, so this
-  // routes down and lets the caller see the thin manifest.
-  if (manifest.usedTokens < manifest.budgetTokens * 0.1) {
-    return {
-      model: "claude-haiku-4-5",
-      effort: "low",
-      rationale: "the window is nearly empty; the honest output is short and a larger model cannot fix retrieval",
     };
   }
 
