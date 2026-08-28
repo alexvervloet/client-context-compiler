@@ -39,6 +39,13 @@ Now generate Whitfield's meeting prep:
 And the output says "you have a tuition payment due September 12", which is
 false, embarrassing, and a phone call to the firm.
 
+Note what the harm is and is not. Whitfield is a recipient of that thread, so he
+learns nothing he did not already know. The output is a false statement about
+his own finances, produced with a valid citation, in a document his advisor acts
+on. Disclosure is the same bug's other outcome and it is the easier half: Osei's
+separate education-funding plan is owned by him alone and never reaches
+Whitfield's candidate set at all.
+
 Call it an **attribution failure**. The claim is true, sourced, and about the
 wrong person. There is no standard eval for it because most benchmarks were
 built for question answering, where correctness is a property of the claim
