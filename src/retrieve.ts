@@ -53,15 +53,20 @@ export type SearchOptions = {
   recencyWeight?: number;
   /** Age at which a record has half the recency score of a new one. */
   halfLifeDays?: number;
-  /** Candidates below this similarity are not worth a place in the window. */
-  minSimilarity?: number;
+  /**
+   * Floor, as a fraction of the best similarity in this search rather than an
+   * absolute cosine. A raw threshold does not survive changing embedding
+   * model: the mock here scores in a different range than Voyage does, and a
+   * number tuned against one silently empties windows under the other.
+   */
+  relativeFloor?: number;
 };
 
 const DEFAULTS = {
   topK: 40,
   recencyWeight: 0.35,
   halfLifeDays: 180,
-  minSimilarity: 0.02,
+  relativeFloor: 0.15,
 };
 
 export async function search(
@@ -71,13 +76,14 @@ export async function search(
   const topK = options.topK ?? DEFAULTS.topK;
   const recencyWeight = options.recencyWeight ?? DEFAULTS.recencyWeight;
   const halfLifeDays = options.halfLifeDays ?? DEFAULTS.halfLifeDays;
-  const minSimilarity = options.minSimilarity ?? DEFAULTS.minSimilarity;
+  const relativeFloor = options.relativeFloor ?? DEFAULTS.relativeFloor;
 
   const [queryVector] = await index.embedder.embed([options.query]);
   if (queryVector === undefined) throw new Error("embedder returned no query vector");
 
   const nowMs = Date.parse(options.now);
-  const candidates: Candidate[] = [];
+  const scored: Candidate[] = [];
+  let best = 0;
 
   for (let i = 0; i < index.chunks.length; i++) {
     const chunk = index.chunks[i];
@@ -88,17 +94,27 @@ export async function search(
     if (!servesSubject(chunk, options.subject)) continue;
 
     const similarity = cosine(queryVector, vector);
-    if (similarity < minSimilarity) continue;
+    if (similarity > best) best = similarity;
 
     const ageDays = Math.max(0, (nowMs - Date.parse(chunk.timestamp)) / 86_400_000);
     const recency = Math.pow(0.5, ageDays / halfLifeDays);
-    candidates.push({
+    scored.push({
       chunk,
       similarity,
       recency,
       score: similarity * (1 - recencyWeight) + recency * recencyWeight,
     });
   }
+
+  // The floor exists to stop a long tail of weak matches eating the budget.
+  // With no tail there is nothing to trim, and trimming anyway is how a client
+  // with a thin file ends up with an empty window. Relative to this search's
+  // own best match, because an absolute cosine does not survive a change of
+  // embedding model.
+  const applyFloor = scored.length > topK && best > 0;
+  const candidates = applyFloor
+    ? scored.filter((c) => c.similarity >= best * relativeFloor)
+    : scored;
 
   candidates.sort((a, b) => b.score - a.score);
   return candidates.slice(0, topK);
