@@ -73,6 +73,20 @@ const DEFAULT_CAP_USD = Number(process.env["SPEND_CAP_USD"] ?? 0.5);
 
 export const ledger: Ledger = makeLedger(DEFAULT_CAP_USD);
 
+/**
+ * Voyage list price, USD per million tokens, for the default model.
+ *
+ * Taken from Voyage's published pricing and not independently verified here.
+ * It is used to charge embedding against the same cap as generation; if it is
+ * wrong, the cap is wrong in proportion, which is still better than embedding
+ * being uncounted entirely.
+ */
+export const EMBED_PRICE_PER_MTOK = Number(process.env["EMBED_PRICE_PER_MTOK"] ?? 0.18);
+
+export function projectEmbeddingUsd(tokens: number): number {
+  return (tokens * EMBED_PRICE_PER_MTOK) / 1_000_000;
+}
+
 /** The most a single request could cost, if it generated to its limit. */
 export function projectWorstCaseUsd(
   model: ModelId,

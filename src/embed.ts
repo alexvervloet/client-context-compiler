@@ -10,6 +10,8 @@
  */
 
 import { withDiskCache } from "./embed-cache.ts";
+import { ledger, projectEmbeddingUsd } from "./spend.ts";
+import { estimateTokens } from "./tokens.ts";
 
 const MOCK_DIMENSIONS = 256;
 
@@ -93,6 +95,14 @@ export function makeVoyageEmbedder(apiKey: string, model = "voyage-3-large"): Em
     dimensions: 1024,
     isMock: false,
     async embed(texts) {
+      // Embedding is a paid call and was going through no ledger at all. The
+      // module that exists because an uncapped loop emptied an account had a
+      // second uncapped loop beside it, and SPEND_CAP_USD would not have
+      // stopped it at any value.
+      const tokens = texts.reduce((n, text) => n + estimateTokens(text), 0);
+      const projected = projectEmbeddingUsd(tokens);
+      ledger.authorize(projected, `embedding ${texts.length} chunks (~${tokens} tokens)`);
+
       const response = await fetch("https://api.voyageai.com/v1/embeddings", {
         method: "POST",
         headers: {
@@ -112,6 +122,7 @@ export function makeVoyageEmbedder(apiKey: string, model = "voyage-3-large"): Em
       for (const item of payload.data) {
         out[item.index] = Float32Array.from(item.embedding);
       }
+      ledger.record(projected);
       return out.map((vector, i) => {
         if (vector === undefined) throw new Error(`voyage returned no vector for input ${i}`);
         return vector;
