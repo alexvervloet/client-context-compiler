@@ -71,14 +71,15 @@ decision about what goes in.
 This one is sneaky, so read it twice.
 
 Two of Priya's clients are both called **James**. James Whitfield and James
-Osei. They are unrelated. They do not know each other socially. But they happen
-to co-own a small property company together, so they email each other about it,
-and they copy Priya on those emails.
+Osei. They are not family, not married, not in the same household. They are
+business partners: they co-own a small property company, so they email each
+other about it and copy Priya, who advises both of them separately.
 
-In one of those emails, James Osei writes:
+Whitfield emails Osei to say he wants to delay a payout from the company until
+October. Osei replies, to Whitfield, with Priya copied:
 
-> James, I need my share of the money released on the original schedule. My
-> daughter's tuition is due September 12.
+> That does not work for me. My daughter's tuition is due September 12 and I
+> was counting on the Q3 distribution to cover it.
 
 Now Priya asks the assistant to prepare her for a meeting with **Whitfield**.
 
@@ -91,14 +92,32 @@ And the prep note comes out saying:
 
 > James has a tuition payment due September 12.
 
-That sentence is a disaster. Priya walks into a room with James Whitfield and
-brings up his daughter's tuition. He does not have a daughter in college. What
-he now knows is that his business partner is short of cash, and he learned it
-from his own advisor.
+That sentence is false. Whitfield has no tuition bill. The obligation is Osei's,
+and the email said so plainly, and the program lost track of which James was
+which.
+
+Be precise about the damage here, because this is where I got it wrong the first
+time I wrote this page. Whitfield is not learning a secret. He received that
+email. He knows Osei needs the money, because Osei told him directly.
+
+The damage is that Priya now holds a document about her client that is wrong
+about her client. She walks into the room ready to solve a September cash-flow
+problem he does not have. If she acts on it she reschedules the wrong payment,
+plans around the wrong number, and files a prep note recording a debt he does
+not owe. In a business where somebody may later audit that file, a confident
+false statement about a client's obligations is its own problem, separate from
+anybody's secrets.
+
+There is a version of this that *is* a disclosure. Osei has a separate planning
+document, one Whitfield has never seen, working through how to fund that $58K.
+If a sentence from that document turned up in Whitfield's briefing, he would
+learn something new. That case is easier to catch, because the document belongs
+to Osei and nobody else, so the program can throw it out without reading a word
+of it. The hard case is the email, where both men are genuinely on it.
 
 Nothing was hacked. Nobody broke in. Every password was correct, every
 permission check said yes. The program just did not understand that a sentence
-in an email about two people belongs to only one of them.
+in an email between two people can belong to only one of them.
 
 The repository has a name for this. Being *allowed to see* a document is not the
 same as *the document being about you*.
@@ -288,9 +307,10 @@ Four things.
 An AI model only knows what is in front of it, so deciding what to put in front
 of it is a real engineering problem with real consequences.
 
-Permission and relevance are different questions. Priya was allowed to read that
-email. It still had no business in Whitfield's briefing. Most security thinking
-only covers the first question.
+Permission and ownership are different questions. Priya was allowed to read that
+email, and it was genuinely relevant to Whitfield, and one sentence in it still
+belonged to somebody else. Most security thinking only covers the first
+question.
 
 Rules that matter go in code, not in instructions. Code refuses. Instructions get
 ignored, especially by a system that cannot tell your instructions from someone
