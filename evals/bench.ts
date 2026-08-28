@@ -78,21 +78,6 @@ const hasKey =
   (process.env["ANTHROPIC_API_KEY"] ?? "") !== "" ||
   (process.env["ANTHROPIC_AUTH_TOKEN"] ?? "") !== "";
 
-if (!hasKey) {
-  process.stderr.write(
-    [
-      "",
-      "  This bench needs Anthropic credentials and will not run against the mock.",
-      "  A model comparison built from stub output looks identical to a real one",
-      "  and means nothing, and that table would end up in a README.",
-      "",
-      "    secrun npm run bench",
-      "",
-    ].join("\n"),
-  );
-  process.exit(2);
-}
-
 type Row = {
   task: TaskKind;
   model: ModelId;
@@ -138,13 +123,33 @@ note(`worst case if every call generates to its limit: $${worstCaseUsd.toFixed(2
 note(`spend cap for this process: $${ledger.capUsd.toFixed(2)} (SPEND_CAP_USD)`);
 note("");
 
+// The projection comes before the credentials check on purpose. Its whole job
+// is to tell you what a run would cost before you commit to one, and a version
+// that only worked once you were already holding the keys was useless for
+// exactly the person who most needed it. It also made `npm run bench` exit 2
+// in CI rather than reporting a cost.
 if (values.confirm !== true) {
   note("Dry run. No network calls have been made, embeddings included.");
-  note("Re-run with --confirm to build the index and make the calls:");
+  note(
+    hasKey
+      ? "Re-run with --confirm to build the index and make the calls:"
+      : "No credentials found, so this projection is all you can get here. With them:",
+  );
   note("");
   note(`  secrun npm run bench -- --confirm${values.models === undefined ? "" : ` --models ${values.models}`}`);
   note("");
   process.exit(0);
+}
+
+if (!hasKey) {
+  note("");
+  note("  --confirm needs credentials. This bench will not run against the mock:");
+  note("  a comparison built from stub output looks identical to a real one, and");
+  note("  that table would end up in a README.");
+  note("");
+  note("    secrun npm run bench -- --confirm");
+  note("");
+  process.exit(2);
 }
 
 if (worstCaseUsd > ledger.capUsd) {
