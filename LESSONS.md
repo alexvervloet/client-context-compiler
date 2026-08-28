@@ -332,3 +332,50 @@ dependencies, a cost gate that only knows about one of them is worse than no
 gate, because it prints a reassuring number. Trace the whole path before
 writing the reassurance, and put the gate before the first call rather than
 before the first *interesting* call.
+
+## An outside audit found a leak, and the shape of it was predictable
+
+An independent agent audited this repository with no history of building it.
+It found a real leak, refuted two of the eight claims the README makes, and
+showed that four safety mechanisms could be deleted with every test still
+green. The full report is worth more than this summary; what follows is what I
+would tell someone starting a similar project.
+
+**The bug.** A session turn recorded as one client's, whose text names a
+different client, was admitted into that second client's window carrying the
+first client's numbers. `fence.ts` resolved "whose passage is this" from the
+prose first and the record's `owners` field only as a fallback, so any chunk
+that named someone unambiguously had its provenance discarded. Client records
+were shielded because retrieval checks owners independently. Conversation turns
+never go through retrieval, so the fence was their only gate.
+
+The entry three sections above this one already states the correct rule:
+provenance is a separate signal and it has to be carried, not re-derived. I
+wrote that down and then implemented the opposite precedence one commit later.
+Writing a lesson down is not the same as applying it, and a repository that
+documents its own reasoning can read as more trustworthy than it is.
+
+**Why my tests missed it.** The carry-over suite runs 108 ordered pairs of
+clients. Every prior answer in it is phrased in pronouns or the owner's own
+name — "She has reversed her 2024 position" — and not one names a *different*
+client. So it exercised one arm of the anchor rule 108 times and never touched
+the other, which is where the bug was.
+
+That generalises. The tests were written from the same mental model as the
+code, so they cover the branch the author was thinking about and skip its
+complement. Volume did not help: 108 cases of the same shape is one case.
+
+**The measurement that showed how bad it was.** The auditor ran fourteen
+single-line mutations. Ten survived the full 290-check suite; five survived the
+unit tests too. The client pre-filter could be deleted outright, the
+`unanchored` refusal removed, the fence policy forced to one value, and the
+redaction mask set to the empty string, with everything green. The suite was
+testing the corpus rather than the code: a corpus-driven test only reaches
+branches the bundled data happens to enter.
+
+**Next time:** mutation testing before claiming an eval suite catches
+regressions, and it costs nothing. For any rule with two arms, write the case
+for each arm explicitly rather than trusting a large number of generated cases
+to cover both. And when a project's central claim is a safety property, get
+someone who did not build it to attack it, because the author's tests and the
+author's bugs come from the same place.
