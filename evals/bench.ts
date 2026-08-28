@@ -10,10 +10,18 @@
  * produce a table that looks exactly like a real one and means nothing, and
  * that table would end up in a README.
  *
- * Progress goes to stderr, the table to stdout:
+ * It also refuses to spend anything until you have seen what it will cost.
+ * The first version of this file did not: it made twelve calls with adaptive
+ * thinking, effort forced to high on every model including Opus, and
+ * max_tokens of 16000, and the thing that eventually stopped it was the
+ * account running out of credit. So the default now is a dry run that prints
+ * a projection and exits, Opus is opt-in rather than included, and every call
+ * goes through the spend ledger.
  *
- *   secrun npm run --silent bench > bench.md
- *   secrun npm run bench -- --models claude-opus-5,claude-haiku-4-5
+ *   npm run bench                          # dry run: what would this cost?
+ *   secrun npm run bench -- --confirm      # actually spend it
+ *   secrun npm run bench -- --confirm --models claude-opus-5
+ *   SPEND_CAP_USD=2 secrun npm run bench -- --confirm
  */
 
 import { parseArgs } from "node:util";
@@ -21,15 +29,26 @@ import { makeCompiler } from "../src/compile.ts";
 import { answer } from "../src/answer.ts";
 import { resolveEmbedder } from "../src/embed.ts";
 import { findMentions } from "../src/mentions.ts";
-import { PRICING } from "../src/route.ts";
+import { PRICING, routeFor } from "../src/route.ts";
 import type { ModelId } from "../src/route.ts";
 import { clientById } from "../src/corpus/roster.ts";
 import { TASK_KINDS } from "../src/types.ts";
 import type { TaskKind } from "../src/types.ts";
 import { elapsed, note, withHeartbeat } from "./progress.ts";
+import { ledger, projectWorstCaseUsd } from "../src/spend.ts";
+import { estimateTokens } from "../src/tokens.ts";
+import { buildPrompt } from "../src/answer.ts";
 
 const NOW = "2026-08-27T09:00:00Z";
 const BUDGET = 12000;
+
+/** Mirrors the per-task output ceilings in answer.ts, for the projection. */
+const MAX_OUTPUT: Record<TaskKind, number> = {
+  "daily-briefing": 3000,
+  "meeting-prep": 4000,
+  "post-meeting-followup": 3000,
+  "compliance-review": 5000,
+};
 
 /** One client per task, chosen to sit on a trap rather than an easy file. */
 const SUBJECTS: Record<TaskKind, string> = {
@@ -44,12 +63,13 @@ const { values } = parseArgs({
   options: {
     models: { type: "string" },
     repeats: { type: "string" },
+    confirm: { type: "boolean" },
   },
 });
 
-const models = (values.models ?? "claude-opus-5,claude-sonnet-5,claude-haiku-4-5").split(
-  ",",
-) as ModelId[];
+// Opus is not in the default set. Adding it is a decision someone makes on
+// purpose, having seen the projection.
+const models = (values.models ?? "claude-haiku-4-5,claude-sonnet-5").split(",") as ModelId[];
 const repeats = Number(values.repeats ?? 1);
 
 const hasKey =
@@ -94,8 +114,6 @@ type Row = {
 
 const benchStartedAt = performance.now();
 const totalCalls = TASK_KINDS.length * models.length * repeats;
-note(`${totalCalls} model calls ahead: ${TASK_KINDS.length} tasks x ${models.length} models x ${repeats}.`);
-note("The markdown table goes to stdout, this commentary to stderr.");
 
 const embedder = resolveEmbedder();
 note(`building the index with ${embedder.name}`);
@@ -105,8 +123,11 @@ const compiler = await makeCompiler({
     if (done % 384 === 0 || done === total) note(`  embedded ${done}/${total}`);
   },
 });
-const rows: Row[] = [];
-let call = 0;
+
+// ------------------------------------------------- what is this going to cost
+
+const contexts = new Map<TaskKind, Awaited<ReturnType<typeof compiler.compile>>>();
+let worstCaseUsd = 0;
 
 for (const task of TASK_KINDS) {
   const clientId = SUBJECTS[task];
@@ -118,6 +139,46 @@ for (const task of TASK_KINDS) {
     budgetTokens: BUDGET,
     now: NOW,
   });
+  contexts.set(task, context);
+
+  const promptTokens = estimateTokens(buildPrompt(context, task));
+  for (const model of models) {
+    worstCaseUsd += projectWorstCaseUsd(model, promptTokens, MAX_OUTPUT[task]) * repeats;
+  }
+}
+
+note("");
+note(`${totalCalls} calls: ${TASK_KINDS.length} tasks x ${models.length} models x ${repeats}.`);
+note(`models: ${models.join(", ")}`);
+note(`worst case if every call generates to its limit: $${worstCaseUsd.toFixed(2)}`);
+note(`spend cap for this process: $${ledger.capUsd.toFixed(2)} (SPEND_CAP_USD)`);
+note("");
+
+if (values.confirm !== true) {
+  note("Dry run. Nothing has been spent and nothing will be.");
+  note("Re-run with --confirm to make the calls:");
+  note("");
+  note(`  secrun npm run bench -- --confirm${values.models === undefined ? "" : ` --models ${values.models}`}`);
+  note("");
+  process.exit(0);
+}
+
+if (worstCaseUsd > ledger.capUsd) {
+  note(
+    `Refusing to start: the worst case ($${worstCaseUsd.toFixed(2)}) is above the ` +
+      `cap ($${ledger.capUsd.toFixed(2)}). Either drop a model or raise the cap ` +
+      "deliberately with SPEND_CAP_USD.",
+  );
+  process.exit(2);
+}
+
+const rows: Row[] = [];
+let call = 0;
+
+for (const task of TASK_KINDS) {
+  const clientId = SUBJECTS[task];
+  const context = contexts.get(task);
+  if (context === undefined) continue;
   note(`${task} (${clientId}): window is ${context.manifest.usedTokens} tokens`);
 
   for (const model of models) {
@@ -125,12 +186,12 @@ for (const task of TASK_KINDS) {
       const label = `${task} on ${model}`;
       note(`[${++call}/${totalCalls}] ${label} ...`);
       const started = performance.now();
+      // Effort comes from what this task would actually route at, not forced
+      // to high for everything. Forcing high on every model is what made the
+      // first version of this bench expensive.
+      const effort = routeFor(task).effort;
       const out = await withHeartbeat(label, note, () =>
-        answer({
-          context,
-          task,
-          route: { model, effort: "high", rationale: "bench" },
-        }),
+        answer({ context, task, route: { model, effort, rationale: "bench" } }),
       );
       const ms = performance.now() - started;
       note(
@@ -163,7 +224,10 @@ const say = (line = ""): void => {
   process.stdout.write(`${line}\n`);
 };
 
-note(`all ${totalCalls} calls done in ${elapsed(benchStartedAt)}`);
+note(
+  `all ${totalCalls} calls done in ${elapsed(benchStartedAt)}, ` +
+    `$${ledger.spentUsd().toFixed(4)} spent of a $${ledger.capUsd.toFixed(2)} cap`,
+);
 
 say();
 say("## Model comparison");
