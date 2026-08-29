@@ -44,7 +44,19 @@ const { values, positionals } = parseArgs({
 });
 
 const command = positionals[0];
-const budgetTokens = Number(values.budget ?? 8000);
+
+function requireBudget(value: string | undefined): number {
+  const parsed = Number(value ?? 8000);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    // Number("abc") is NaN, and NaN compares false against every bound the
+    // packer checks. Catching it here means the error names the flag the user
+    // typed rather than surfacing three layers down.
+    throw new Error(`--budget must be a positive number, not ${JSON.stringify(value)}`);
+  }
+  return parsed;
+}
+
+const budgetTokens = requireBudget(values.budget);
 const policy = (values.policy ?? "strict") as FencePolicy;
 const now = values.now ?? "2026-08-27T09:00:00Z";
 

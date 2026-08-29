@@ -143,6 +143,18 @@ export function pack(input: PackInput): CompiledContext {
   // shares out, rather than discovering it after the fact.
   const scaffold = scaffoldTokens(request, clientName);
 
+  // NaN is not a budget, and it used to behave like an infinite one. Both
+  // guards in this function are `<` and `>` comparisons, and both are false
+  // against NaN, so `--budget abc` sailed past the floor here and past the
+  // ceiling at the end and produced an unbounded window. Order the check so
+  // the value has to prove itself a number rather than fail to be too small.
+  if (!Number.isFinite(request.budgetTokens) || request.budgetTokens <= 0) {
+    throw new Error(
+      `budgetTokens must be a positive finite number, not ${JSON.stringify(request.budgetTokens)}. ` +
+        "Nothing was compiled.",
+    );
+  }
+
   // A budget smaller than the window's own furniture is not an estimator
   // problem, and saying so sends the caller hunting a bug that is not there.
   // The header and layer headings are mandatory; below that, no window exists.

@@ -153,3 +153,16 @@ test("an ordinary passage is left alone and not annotated", () => {
   assert.ok(entry !== undefined && entry.admitted);
   assert.equal(entry.forgedStructure, undefined);
 });
+
+test("a budget that is not a number is refused rather than treated as infinite", async () => {
+  // Both budget guards in the packer are ordered comparisons, and every one of
+  // these is false against NaN. `--budget abc` used to compile an unbounded
+  // window and report "budget NaN (NaN% full)".
+  for (const budgetTokens of [Number.NaN, Number.POSITIVE_INFINITY, 0, -1]) {
+    await assert.rejects(
+      () => compiler.compile(request({ budgetTokens })),
+      /budgetTokens must be a positive finite number/,
+      `a budget of ${budgetTokens} should be refused`,
+    );
+  }
+});
