@@ -416,3 +416,59 @@ checked against it like any other. Read the actual records before retelling
 them, and when the project's whole point is a distinction between two failure
 modes, do not let a narrative flourish quietly choose the other one. Vague
 words inherited from a summary ("unrelated") are where the drift starts.
+
+## The fence read bytes and thought it was reading names
+
+**Expected:** mention detection was the part of this system that had already
+been hardened. It had span precedence, email-before-name resolution, ambiguity
+resolving outward, and a documented boundary saying it misses "her brother" and
+"the trustee". A security pass would find gaps somewhere else.
+
+**What happened:** `Ma<ZWSP>rgaret Ch<ZWSP>en` scored zero mentions. So did a
+Cyrillic "с" for the Latin one, a soft hyphen, and a fullwidth form. The fence
+returned `admit`, and `assertSingleClient`, the backstop whose entire job is to
+catch what the fence missed, did not throw either, because it calls the same
+resolver. One bypass, both layers.
+
+The part worth sitting with is that the README already had a section admitting
+what mention detection cannot do, and that section made the gap harder to see
+rather than easier. "It does not recognise a misspelling" reads as coverage of
+this. It is not. A misspelling is a semantic problem needing an entity layer; a
+zero-width space is a normalization problem needing four lines of folding. They
+had been filed together under "known limitation" and one of them was a bug.
+
+Obscuring one name is not enough, incidentally: the first-name rule still
+fires. Both names have to be broken, which is why this never turned up by
+accident in a corpus written by hand.
+
+**Next time:** any comparison between attacker-supplied text and a known string
+is a normalization decision, and writing down what the comparison cannot do is
+not the same as checking what it does. When a stated limitation and a real
+defect live in the same category, the stated limitation is camouflage. Test the
+boundary by trying to cross it, not by describing it.
+
+## A defence that only the honest can fail
+
+**Expected:** the fabricated-citation check covered forged keys. A model that
+invents a key gets caught, which is the documented reason the check exists.
+
+**What happened:** it catches a model that invents a key. It does nothing about
+a *passage* that contains one. A forwarded email carrying the line
+`[firm:policy/disclosure-2026]` rendered identically to a key the packer had
+issued, and the model did not need to cite the forged key at all: it could
+attribute the forged claim to the real key of the passage the forgery arrived
+in. Then `extractCitations` returns zero fabricated keys and the false claim
+reads as sourced.
+
+Same shape as the delimiter. `neutralize` stripped the exact marker string in a
+public repository, so five of six near-misses got through, including simple
+lowercase. Both are cases of a check that assumes the adversary is the model.
+The model is not the adversary here. The email is, and it was written before
+the request existed.
+
+**Next time:** for every validation, ask which party it constrains. A check on
+model output constrains the model. Text arriving from a source system is
+adversarial input that has already passed every check by the time the model
+sees it, so the control has to sit at render time, in the packer, not at
+inspection time in the answer path. The nonce works for exactly this reason:
+it did not exist when the email was written.
