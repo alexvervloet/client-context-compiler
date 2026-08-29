@@ -11,21 +11,31 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { buildRequestParams } from "../src/answer.ts";
+import type { Prompt } from "../src/answer.ts";
 import { CAPABILITIES, routeFor } from "../src/route.ts";
 import type { ModelId, Route } from "../src/route.ts";
 
 const route = (model: ModelId): Route => ({ model, effort: "high", rationale: "test" });
 
+// The system prompt and the window are joined by a nonce, so they travel as a
+// pair. Anything that builds one without the other is the bug the pair exists
+// to prevent.
+const prompt = (text: string): Prompt => ({
+  text,
+  system: "system prompt naming a citation key",
+  nonce: "0123456789ab",
+});
+
 test("the 4.6-family models get adaptive thinking and an effort setting", () => {
   for (const model of ["claude-opus-5", "claude-sonnet-5"] as ModelId[]) {
-    const params = buildRequestParams(route(model), "hello");
+    const params = buildRequestParams(route(model), prompt("hello"));
     assert.deepEqual(params.thinking, { type: "adaptive" });
     assert.deepEqual(params.output_config, { effort: "high" });
   }
 });
 
 test("Haiku 4.5 gets neither, because either one is a 400", () => {
-  const params = buildRequestParams(route("claude-haiku-4-5"), "hello");
+  const params = buildRequestParams(route("claude-haiku-4-5"), prompt("hello"));
   assert.equal(params.thinking, undefined);
   assert.equal(params.output_config, undefined);
 });
@@ -35,7 +45,7 @@ test("every model the router can return has a capability entry", () => {
   const reachable: ModelId[] = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"];
   for (const model of reachable) {
     assert.ok(CAPABILITIES[model] !== undefined, `${model} has no capability entry`);
-    assert.doesNotThrow(() => buildRequestParams(route(model), "hello"));
+    assert.doesNotThrow(() => buildRequestParams(route(model), prompt("hello")));
   }
 });
 
@@ -61,13 +71,13 @@ test("the route the router picks for a thin window is actually sendable", () => 
     },
   });
   assert.equal(thin.model, "claude-haiku-4-5");
-  const params = buildRequestParams(thin, "hello");
+  const params = buildRequestParams(thin, prompt("hello"));
   assert.equal(params.thinking, undefined);
   assert.equal(params.model, "claude-haiku-4-5");
 });
 
 test("the prompt and streaming flag survive into the request", () => {
-  const params = buildRequestParams(route("claude-opus-5"), "the compiled window");
+  const params = buildRequestParams(route("claude-opus-5"), prompt("the compiled window"));
   assert.equal(params.stream, true);
   assert.deepEqual(params.messages, [{ role: "user", content: "the compiled window" }]);
   assert.ok(typeof params.system === "string" && params.system.includes("citation"));

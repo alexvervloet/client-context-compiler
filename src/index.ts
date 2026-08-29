@@ -71,7 +71,7 @@ export type { FencePolicy } from "./fence.ts";
 // --------------------------------------------------------------- generation
 
 export { answer, buildPrompt, extractCitations } from "./answer.ts";
-export type { Answer, AnswerOptions } from "./answer.ts";
+export type { Answer, AnswerOptions, Prompt } from "./answer.ts";
 
 // ------------------------------------------------------------------ routing
 
