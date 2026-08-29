@@ -10,6 +10,7 @@ import { report, runSuites } from "./harness.ts";
 import { authorizationSuite, leakSuite, trapSuite } from "./leak.ts";
 import { budgetSuite } from "./budget.ts";
 import { carryoverSuite } from "./carryover.ts";
+import { injectionSuite } from "./injection.ts";
 import { qualitySuite } from "./quality.ts";
 
 function hasCredentials(): boolean {
@@ -27,6 +28,7 @@ const suites = [
   trapSuite("redact"),
   authorizationSuite(),
   carryoverSuite(),
+  injectionSuite(),
   budgetSuite(),
   qualitySuite(),
 ];
