@@ -51,10 +51,26 @@ those routes gets through, and an independent audit demonstrated it. What
 holds the line underneath is provenance: a record belongs to whoever the
 source system says it belongs to, and no phrasing inside it changes that.
 
+Names are compared on what they look like, not how they are encoded. A
+zero-width space inside a surname, a Cyrillic "с" for the Latin one, a soft
+hyphen, an accent, a fullwidth form: all of them are invisible or nearly so to
+a reader and to a model, and all of them used to score zero mentions and walk
+past both the fence and the assertion behind it. Matching now runs over a
+folded copy of the text. That is a different problem from the one above, and
+worth keeping separate: "her brother" needs an entity layer to solve, while a
+disguised name only needed the comparison to happen on the right string.
+
 **Says why.** Every candidate appears in the manifest with a verdict: admitted,
 dropped for budget, held back by the fence, refused for authorization. During
 an incident review that is the difference between "the model missed it" and
 "the model never saw it".
+
+**Refuses to let a passage write the window.** Source text cannot mint a
+citation key, add a layer heading, or forge the marker that separates
+instructions from data. That marker carries a nonce generated per request, so
+no email written in advance can contain it. The forged-key check alone is not
+enough here: a passage that invents a key can simply cite the real key of the
+passage it arrived in, and the citation validates.
 
 **Cites everything back to a record.** Each passage carries a key like
 `gmail:message/t_harbor_point_distributionm1`, validated against the manifest.
@@ -486,10 +502,18 @@ a session turn saying "what about that?" being safe and being a leak.
 
 ## Limitations
 
-Mention detection is a roster lookup with span precedence. It handles surnames,
-first names, initials and email addresses. It does not handle "her brother",
-"the trustee", or a misspelling, and a production version needs an entity layer
+Mention detection is a roster lookup with span precedence over a folded copy of
+the text. It handles surnames, first names, initials and email addresses, and
+it is not fooled by invisible characters, confusable letters from other
+scripts, accents or fullwidth forms. It does not handle "her brother", "the
+trustee", or a misspelling, and a production version needs an entity layer
 rather than a name list.
+
+The confusable table is the practical Cyrillic and Greek subset, not the full
+Unicode set. It covers what can be typed on an ordinary keyboard layout and
+spells a Latin name convincingly. A determined attacker with the whole
+confusables table has more room than that, and the honest mitigation for a real
+deployment is to reject or flag mixed-script text at the connector.
 
 The corpus is synthetic. The relationships in it are the realistic part; the
 prose is not, and the mock embedder scores lexical overlap rather than meaning,
