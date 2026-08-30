@@ -1,0 +1,24 @@
+version: 2
+
+updates:
+  # One runtime dependency and a handful of dev tools, so a weekly batch is
+  # enough. Dev updates arrive grouped: reviewing six lockfile bumps as one
+  # PR beats closing six of them unread.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  # The CI workflow pins actions by major version, which still leaves the
+  # pinned majors going stale silently.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
