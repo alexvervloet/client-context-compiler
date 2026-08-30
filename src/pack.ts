@@ -51,7 +51,7 @@ export type PackInput = {
   /** Scored candidates from retrieval: client history and firm knowledge. */
   candidates: Candidate[];
   /** Eligible chunks retrieval ranked out, so the manifest can name them. */
-  retrievalDropped?: Array<{ chunk: Chunk; score: number; detail: string }>;
+  retrievalDropped?: { chunk: Chunk; score: number; detail: string }[];
   /** This session's turns, oldest first. Not retrieved, always considered. */
   conversation?: Chunk[];
   /** Every client the advisor may see. */
@@ -170,7 +170,7 @@ export function pack(input: PackInput): CompiledContext {
   let remaining = available;
 
   for (const layer of FILL_ORDER) {
-    const share = Math.floor(available * (budgets[layer] ?? 0));
+    const share = Math.floor(available * budgets[layer]);
     // The last layer gets everything left, not just its nominal share.
     const allowance = layer === "client" ? remaining : Math.min(share, remaining);
     let spent = 0;
