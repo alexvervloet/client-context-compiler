@@ -472,3 +472,49 @@ adversarial input that has already passed every check by the time the model
 sees it, so the control has to sit at render time, in the packer, not at
 inspection time in the answer path. The nonce works for exactly this reason:
 it did not exist when the email was written.
+
+## A wrong type annotation makes a real guard look like dead code
+
+**Expected:** turning on `no-unnecessary-condition` would find leftover
+defensiveness. Conditions that used to matter, kept after the code around them
+stopped being able to produce the value they check for.
+
+**What happened:** it found two of those, in `pack.ts` and `route.ts`, and both
+were exactly that. The third was the opposite. In the voyage branch of
+`embed.ts`, the result was declared `Float32Array[]` and built with
+`new Array(texts.length)`, then filled by index from whatever the API returned.
+If the API returns fewer items than it was asked for, the gaps stay empty. The
+guard three lines down handles that. The annotation said the gaps could not
+exist, so the linter reported the guard as unnecessary.
+
+The type was wrong and the guard was right. Following the lint message would
+have deleted the only thing standing between a short response and a
+`Float32Array` that is actually `undefined`, several call frames away from
+anything that could explain it. `embed-cache.ts` had already declared the same
+array `Array<Float32Array | undefined>`, which is what made the disagreement
+obvious.
+
+**Next time:** `no-unnecessary-condition` reports a disagreement between a
+check and a type. It cannot tell which of the two is wrong. When it fires on a
+guard against a value crossing a process boundary, suspect the annotation
+first. The rule is only as honest as the types it reads.
+
+## A fixer that made the code worse, quietly
+
+**Expected:** `--fix` on formatting rules is mechanical and safe to apply in
+bulk.
+
+**What happened:** `quotes` with `avoidEscape: true` converted a backtick
+string containing double quotes into a double-quoted string with every one of
+them escaped. `avoidEscape` only exempts the *other* quote character; a
+template literal is a separate case governed by `allowTemplateLiterals`, which
+defaults to rewriting them. The result passed lint, typecheck and the tests,
+and was less readable than what it replaced. It was one line in a diff of 83
+autofixes, and reviewing that diff by eye is how it got caught rather than
+anything in the toolchain.
+
+**Next time:** read the content of an autofix diff, not just its size. Running
+`git diff --ignore-all-space` first separates the files where the fixer only
+moved whitespace from the ones where it rewrote an expression. Nineteen of the
+twenty-three files here were pure whitespace, which made the four worth reading
+easy to find.
