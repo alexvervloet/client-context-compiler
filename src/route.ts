@@ -125,7 +125,7 @@ export function routeFor(task: TaskKind, manifest?: Manifest): Route {
   if (admitted.length === 0) return base;
 
   const redacted = admitted.filter(
-    (e) => e.admitted && e.redactedClients !== undefined && e.redactedClients.length > 0,
+    (e) => e.redactedClients !== undefined && e.redactedClients.length > 0,
   ).length;
 
   const share = redacted / admitted.length;
