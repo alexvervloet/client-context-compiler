@@ -26,6 +26,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { numberFromEnv } from "./env.ts";
 
 /** Letters per token in ordinary prose. */
 const LETTERS_PER_TOKEN = 3.4;
@@ -47,7 +48,7 @@ const DIGITS_PER_TOKEN = 2;
  * The cost is real. At 1.30 a window admits roughly a fifth less than it could,
  * which is the price of the budget assertion in pack.ts meaning something.
  */
-const SAFETY_MARGIN = Number(process.env["TOKEN_SAFETY_MARGIN"] ?? 1.3);
+const SAFETY_MARGIN = numberFromEnv("TOKEN_SAFETY_MARGIN", 1.3, 1);
 
 /**
  * Local estimate. Word-based rather than character-based, because character

@@ -15,6 +15,7 @@
 
 import { estimateCostUsd } from "./route.ts";
 import type { ModelId } from "./route.ts";
+import { numberFromEnv } from "./env.ts";
 
 export class SpendCapExceeded extends Error {
   attemptedUsd: number;
@@ -69,7 +70,7 @@ export function makeLedger(capUsd: number): Ledger {
  * repository, and the failure mode of a cap that is too low is an error
  * message, while the failure mode of one that is too high is a bill.
  */
-const DEFAULT_CAP_USD = Number(process.env["SPEND_CAP_USD"] ?? 0.5);
+const DEFAULT_CAP_USD = numberFromEnv("SPEND_CAP_USD", 0.5, 0);
 
 export const ledger: Ledger = makeLedger(DEFAULT_CAP_USD);
 
@@ -81,7 +82,7 @@ export const ledger: Ledger = makeLedger(DEFAULT_CAP_USD);
  * wrong, the cap is wrong in proportion, which is still better than embedding
  * being uncounted entirely.
  */
-export const EMBED_PRICE_PER_MTOK = Number(process.env["EMBED_PRICE_PER_MTOK"] ?? 0.18);
+export const EMBED_PRICE_PER_MTOK = numberFromEnv("EMBED_PRICE_PER_MTOK", 0.18, 0);
 
 export function projectEmbeddingUsd(tokens: number): number {
   return (tokens * EMBED_PRICE_PER_MTOK) / 1_000_000;

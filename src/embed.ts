@@ -12,6 +12,7 @@
 import { withDiskCache } from "./embed-cache.ts";
 import { ledger, projectEmbeddingUsd } from "./spend.ts";
 import { estimateTokens } from "./tokens.ts";
+import { numberFromEnv } from "./env.ts";
 
 const MOCK_DIMENSIONS = 256;
 
@@ -87,7 +88,7 @@ export function cosine(a: Float32Array, b: Float32Array): number {
  * request hangs the process with no error and no output, which is
  * indistinguishable from a slow embedding job right up until it never ends.
  */
-const EMBED_TIMEOUT_MS = Number(process.env["EMBED_TIMEOUT_MS"] ?? 60_000);
+const EMBED_TIMEOUT_MS = numberFromEnv("EMBED_TIMEOUT_MS", 60_000, 1);
 
 export function makeVoyageEmbedder(apiKey: string, model = "voyage-3-large"): Embedder {
   return {

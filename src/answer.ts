@@ -20,6 +20,7 @@ import type { Route } from "./route.ts";
 import { ledger, projectWorstCaseUsd } from "./spend.ts";
 import type { Ledger } from "./spend.ts";
 import { estimateTokens } from "./tokens.ts";
+import { numberFromEnv } from "./env.ts";
 
 const TASK_INSTRUCTIONS: Record<TaskKind, string> = {
   "daily-briefing":
@@ -312,7 +313,7 @@ export async function answer(options: AnswerOptions): Promise<Answer> {
  * two retries, so a wedged request can sit there for half an hour looking
  * exactly like a slow one. Override with ANSWER_TIMEOUT_MS.
  */
-const REQUEST_TIMEOUT_MS = Number(process.env["ANSWER_TIMEOUT_MS"] ?? 180_000);
+const REQUEST_TIMEOUT_MS = numberFromEnv("ANSWER_TIMEOUT_MS", 180_000, 1);
 
 function hasCredentials(): boolean {
   const key = process.env["ANTHROPIC_API_KEY"];
