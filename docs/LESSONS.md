@@ -518,3 +518,35 @@ anything in the toolchain.
 moved whitespace from the ones where it rewrote an expression. Nineteen of the
 twenty-three files here were pure whitespace, which made the four worth reading
 easy to find.
+
+## The empty string is a number, and `??` will not save you from it
+
+**Expected:** the five `Number(process.env["X"] ?? default)` reads had one bug,
+the NaN one already fixed for `--budget`. Writing a guard that rejects NaN and
+negatives would close all five.
+
+**What happened:** that was the dangerous bug but not the only one. `??` fires
+on `undefined`, and `Number("")` is `0`, so a variable exported with no value
+does not take its default. It takes zero. `TOKEN_SAFETY_MARGIN=` sets the
+overcount margin to zero, `estimateTokens` multiplies by it, every chunk
+measures as zero tokens, and every window reports fitting its budget. The
+number the README quotes as the price of the budget assertion meaning
+something silently becomes free.
+
+`X=` is not a contrived input. It is what a shell produces from
+`export X="$SOME_UNSET_VAR"`, which is the ordinary way a wrapper script
+forwards configuration it did not receive. The variable is set, so every
+`is it set` check passes.
+
+Ranking the five by consequence was also wrong in a useful way. The two
+timeouts looked equivalent to the other three, but `AbortSignal.timeout(NaN)`
+throws a RangeError, so those two already failed loudly and merely failed in
+the wrong place. The cap and the price failed silently, and the margin failed
+silently *and* corrupted every downstream number. Only the silent three were
+ever really bugs.
+
+**Next time:** for a value read from the environment, blank and absent are the
+same input and neither is `0`. Check `raw.trim() === ""` alongside `undefined`
+before parsing, not after. And when auditing a group of similar call sites,
+check what each one's bad value actually does downstream before assuming they
+share a severity. Two of these five were already loud.
