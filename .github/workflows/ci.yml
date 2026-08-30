@@ -39,7 +39,7 @@ jobs:
       # or record reaching the history is the failure that matters most.
       # Free for personal and public repos; an org account needs a licence key.
       - name: secret scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
