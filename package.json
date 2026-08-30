@@ -10,6 +10,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "ccc": "node --experimental-strip-types src/cli.ts",
     "evals": "node --experimental-strip-types evals/run.ts",
@@ -20,8 +22,12 @@
     "@anthropic-ai/sdk": "^0.116.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.9.0"
+    "eslint": "^10.9.1",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.68.0"
   },
   "exports": {
     ".": "./src/index.ts"
