@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "coverage": "node --experimental-strip-types --test --experimental-test-coverage --test-coverage-exclude='tests/**' --test-coverage-exclude='evals/**' --test-coverage-lines=88 --test-coverage-branches=85 --test-coverage-functions=80 tests/*.test.ts",
     "ccc": "node --experimental-strip-types src/cli.ts",
     "evals": "node --experimental-strip-types evals/run.ts",
     "measure": "node --experimental-strip-types evals/measure.ts",
