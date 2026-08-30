@@ -116,9 +116,9 @@ export function makeVoyageEmbedder(apiKey: string, model = "voyage-3-large"): Em
         throw new Error(`voyage embeddings failed: ${response.status} ${await response.text()}`);
       }
       const payload = (await response.json()) as {
-        data: Array<{ index: number; embedding: number[] }>;
+        data: { index: number; embedding: number[] }[];
       };
-      const out: Float32Array[] = new Array(texts.length);
+      const out = new Array<Float32Array | undefined>(texts.length);
       for (const item of payload.data) {
         out[item.index] = Float32Array.from(item.embedding);
       }

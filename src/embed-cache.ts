@@ -73,7 +73,7 @@ export function withDiskCache(
     dimensions: embedder.dimensions,
     isMock: false,
     async embed(texts) {
-      const out: Array<Float32Array | undefined> = new Array(texts.length);
+      const out = new Array<Float32Array | undefined>(texts.length);
       const missing: number[] = [];
 
       for (const [i, text] of texts.entries()) {
