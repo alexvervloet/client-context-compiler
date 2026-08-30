@@ -377,6 +377,14 @@ briefing read in under a minute does not need room for sixteen thousand tokens,
 and with adaptive thinking on, every token of headroom is a token that can be
 spent thinking. Same eight calls, same coverage, $0.35.
 
+The cap is also read defensively now, which it was not at first. `Number()`
+on an environment variable returns NaN for anything unparseable, and the
+authorisation check is `spent + projected > capUsd`, which is false against
+NaN. So `SPEND_CAP_USD=abc` did not fail, did not warn, and did not cap: it
+authorised every request. All five numeric variables the process reads are
+now bounded at the point they are read, and a bad one stops the process
+before it does any work.
+
 This is the part of the project I got most wrong, and it is worth saying where:
 the repository already carried a fence, an audit trail and a manifest borrowed
 from a previous project, and left behind the spend ledger from that same
