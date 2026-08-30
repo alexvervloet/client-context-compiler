@@ -154,7 +154,7 @@ if (command === "sweep") {
     ).length;
     process.stdout.write(
       `${String(budget).padStart(6)}${String(m.usedTokens).padStart(8)}` +
-        `${`${((100 * m.usedTokens) / budget).toFixed(0)}%`.padStart(8)}` +
+        `${((100 * m.usedTokens) / budget).toFixed(0)}%`.padStart(8) +
         `${String(admitted).padStart(11)}${String(m.entries.length - admitted).padStart(9)}` +
         `${String(fenced).padStart(8)}\n`,
     );

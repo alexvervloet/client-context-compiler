@@ -27,8 +27,8 @@ export const PRIVATE_MARKERS: Record<ClientId, string[]> = {
 };
 
 /** Every marker belonging to somebody other than the subject. */
-export function foreignMarkers(subject: ClientId): Array<[ClientId, string]> {
-  const out: Array<[ClientId, string]> = [];
+export function foreignMarkers(subject: ClientId): [ClientId, string][] {
+  const out: [ClientId, string][] = [];
   for (const [owner, markers] of Object.entries(PRIVATE_MARKERS)) {
     if (owner === subject) continue;
     for (const marker of markers) out.push([owner, marker]);
@@ -37,6 +37,6 @@ export function foreignMarkers(subject: ClientId): Array<[ClientId, string]> {
 }
 
 /** Markers belonging to another client that appear in this text. */
-export function leakedMarkers(subject: ClientId, text: string): Array<[ClientId, string]> {
+export function leakedMarkers(subject: ClientId, text: string): [ClientId, string][] {
   return foreignMarkers(subject).filter(([, marker]) => text.includes(marker));
 }

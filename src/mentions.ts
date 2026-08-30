@@ -31,7 +31,7 @@ import { CLIENTS } from "./corpus/roster.ts";
 
 export type MentionIndex = {
   /** Surface forms, longest first, each mapped to the clients it can mean. */
-  forms: Array<{ form: string; pattern: RegExp; clients: ClientId[] }>;
+  forms: { form: string; pattern: RegExp; clients: ClientId[] }[];
   byEmail: Map<string, ClientId>;
 };
 
@@ -158,7 +158,7 @@ export function fold(text: string): Folded {
 export function findMentions(text: string, index: MentionIndex): Mention[] {
   const folded = fold(text);
   const mentions: Mention[] = [];
-  const claimed: Array<[number, number]> = [];
+  const claimed: [number, number][] = [];
 
   const overlaps = (start: number, end: number): boolean =>
     claimed.some(([s, e]) => start < e && end > s);

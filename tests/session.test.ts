@@ -86,7 +86,7 @@ test("a turn naming nobody is still refused, on its recorded subject alone", asy
   const turn = out.manifest.entries.find((e) => e.chunkId === "ch_turn_t3");
   assert.ok(turn !== undefined, "the ambiguous follow-up should appear in the manifest");
   assert.equal(turn.admitted, false);
-  assert.ok(turn.admitted === false && turn.reason === "cross-client");
+  assert.ok(!turn.admitted && turn.reason === "cross-client");
 });
 
 test("a session belonging to another advisor is rejected", async () => {

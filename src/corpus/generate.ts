@@ -83,7 +83,7 @@ function bulkThreadsFor(client: ClientSeed, rng: Rng, index: number): GmailThrea
       specs.push({
         from: client.email,
         to: [advisor.email],
-        subject: `${topic}`,
+        subject: topic,
         date: opened,
         body: `${rng.pick(CLIENT_LINES)} This is about ${interest}.`,
       });
@@ -169,7 +169,7 @@ function bulkNotesFor(client: ClientSeed, rng: Rng, index: number): MeetingNote[
 }
 
 function bulkPlansFor(client: ClientSeed, rng: Rng, index: number): PlanningDocument[] {
-  const kinds: Array<PlanningDocument["kind"]> = ["retirement", "tax"];
+  const kinds: PlanningDocument["kind"][] = ["retirement", "tax"];
   return kinds.map((kind, i) =>
     planFrom(
       `plan_${index}_${i}_${client.id.slice(3)}`,

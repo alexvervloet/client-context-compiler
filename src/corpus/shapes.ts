@@ -63,12 +63,12 @@ export type CalendarEvent = {
   location?: string;
   start: { dateTime: string; timeZone: string };
   end: { dateTime: string; timeZone: string };
-  attendees: Array<{
+  attendees: {
     email: string;
     displayName?: string;
     organizer?: boolean;
     responseStatus: "accepted" | "declined" | "tentative" | "needsAction";
-  }>;
+  }[];
   status: "confirmed" | "tentative" | "cancelled";
 };
 
@@ -133,7 +133,7 @@ export function addresses(headerValue: string): string[] {
   return headerValue
     .split(",")
     .map((part) => {
-      const angle = part.match(/<([^>]+)>/);
+      const angle = /<([^>]+)>/.exec(part);
       return (angle?.[1] ?? part).trim().toLowerCase();
     })
     .filter((value) => value !== "");

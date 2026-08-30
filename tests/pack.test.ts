@@ -47,7 +47,7 @@ test("every dropped candidate carries a reason", async () => {
   const dropped = out.manifest.entries.filter((e) => !e.admitted);
   assert.ok(dropped.length > 0, "a 1500-token budget should drop something");
   for (const entry of dropped) {
-    assert.ok(entry.admitted === false && entry.reason.length > 0);
+    assert.ok(!entry.admitted && entry.reason.length > 0);
   }
 });
 

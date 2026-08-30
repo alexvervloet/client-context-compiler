@@ -30,7 +30,7 @@ const NOW = "2026-08-27T09:00:00Z";
  * Ways of writing "Margaret Chen" that a reader and a model both see as the
  * name, and that a byte comparison does not.
  */
-const OBFUSCATED_NAMES: Array<[string, string]> = [
+const OBFUSCATED_NAMES: [string, string][] = [
   ["a zero-width space", "Ma​rgaret Ch​en"],
   ["Cyrillic lookalikes", "Maгgaret Сhen"],
   ["a soft hyphen", "Mar­garet Ch­en"],
@@ -66,7 +66,7 @@ async function windowCarrying(body: string): Promise<CompiledContext> {
   );
   const compiler = await makeCompiler({ chunks, embedder: makeMockEmbedder() });
   const client = clientById("cl_whitfield_james");
-  return compiler.compile({
+  return await compiler.compile({
     task: "meeting-prep",
     clientId: client.id,
     advisorId: client.advisorId,

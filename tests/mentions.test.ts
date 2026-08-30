@@ -65,7 +65,7 @@ test("header addresses map onto clients and ignore the advisor", () => {
 // A name a reader sees as "Margaret Chen" can be encoded a dozen ways that are
 // not that string. Every one of these used to score zero mentions, which meant
 // the fence admitted the passage and the final assertion did not fire either.
-const OBFUSCATED: Array<[string, string]> = [
+const OBFUSCATED: [string, string][] = [
   ["a zero-width space inside both names", "Ma\u200brgaret Ch\u200ben"],
   ["Cyrillic letters standing in for Latin", "Ma\u0433garet \u0421hen"],
   ["a soft hyphen inside both names", "Mar\u00adgaret Ch\u00aden"],

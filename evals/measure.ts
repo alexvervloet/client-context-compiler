@@ -79,7 +79,7 @@ const SWEEP_TASK: TaskKind = "meeting-prep";
 
 say("## What a bigger budget buys");
 say();
-say(`Meeting prep for James Whitfield, strict fence, mock embeddings.`);
+say("Meeting prep for James Whitfield, strict fence, mock embeddings.");
 say();
 say("| budget | used | fill | passages admitted | dropped for budget | held by the fence |");
 say("| ---: | ---: | ---: | ---: | ---: | ---: |");
@@ -225,7 +225,7 @@ if (!hasKey) {
     );
   } else {
     say(
-      `The shipped estimator never undercounted. It overcounts by ` +
+      "The shipped estimator never undercounted. It overcounts by " +
         `${(error.shipped.meanRelative * 100).toFixed(1)}% on average, which is ` +
         "budget spent on nothing and the price of the guarantee holding.",
     );
@@ -251,7 +251,7 @@ if (!hasKey) {
   say("| client | task | budget | estimated | actual | error |");
   say("| --- | --- | ---: | ---: | ---: | ---: |");
 
-  const windowCases: Array<{ clientId: string; task: TaskKind; budget: number }> = [
+  const windowCases: { clientId: string; task: TaskKind; budget: number }[] = [
     { clientId: "cl_whitfield_james", task: "meeting-prep", budget: 8000 },
     { clientId: "cl_chen_margaret", task: "compliance-review", budget: 8000 },
     { clientId: "cl_okonkwo_adaeze", task: "meeting-prep", budget: 16000 },

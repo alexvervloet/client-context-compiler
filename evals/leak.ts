@@ -27,7 +27,7 @@ async function compileFor(
   budgetTokens = 8000,
 ) {
   const client = clientById(clientId);
-  return compiler.compile({
+  return await compiler.compile({
     task,
     clientId,
     advisorId: client.advisorId,
@@ -158,14 +158,14 @@ export function trapSuite(policy: FencePolicy): Suite {
       results.push(
         hasStaleOnly
           ? fail(
-              TRAPS.staleContradiction.name,
-              "the 2024 note reached the window and the 2026 correction did not",
-            )
+            TRAPS.staleContradiction.name,
+            "the 2024 note reached the window and the 2026 correction did not",
+          )
           : check(
-              TRAPS.staleContradiction.name,
-              hasCurrent,
-              "Margaret's compliance review must carry her current conservative rating",
-            ),
+            TRAPS.staleContradiction.name,
+            hasCurrent,
+            "Margaret's compliance review must carry her current conservative rating",
+          ),
       );
 
       return results;

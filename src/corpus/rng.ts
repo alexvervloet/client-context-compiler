@@ -33,13 +33,13 @@ export function makeRng(seed: number): Rng {
 
   const int = (min: number, max: number): number => min + Math.floor(next() * (max - min + 1));
 
-  const pick = <T,>(items: readonly T[]): T => {
+  const pick = <T>(items: readonly T[]): T => {
     const item = items[int(0, items.length - 1)];
     if (item === undefined) throw new Error("pick() from an empty array");
     return item;
   };
 
-  const shuffle = <T,>(items: readonly T[]): T[] => {
+  const shuffle = <T>(items: readonly T[]): T[] => {
     const out = [...items];
     for (let i = out.length - 1; i > 0; i--) {
       const j = int(0, i);

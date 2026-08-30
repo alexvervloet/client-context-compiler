@@ -173,32 +173,32 @@ export type DropReason =
 
 export type ManifestEntry =
   | {
-      admitted: true;
-      chunkId: string;
-      ref: SourceRef;
-      layer: MemoryLayer;
-      tokens: number;
-      score: number;
-      /** Set when a shared chunk was admitted with other clients masked out. */
-      redactedClients?: ClientId[];
-      /**
+    admitted: true;
+    chunkId: string;
+    ref: SourceRef;
+    layer: MemoryLayer;
+    tokens: number;
+    score: number;
+    /** Set when a shared chunk was admitted with other clients masked out. */
+    redactedClients?: ClientId[];
+    /**
        * Set when the passage contained text imitating the window's own
        * structure: a heading, or something shaped like a citation key. The
        * text was defused before rendering. Worth a look during a review,
        * because a source record does not usually do that by accident.
        */
-      forgedStructure?: boolean;
-    }
+    forgedStructure?: boolean;
+  }
   | {
-      admitted: false;
-      chunkId: string;
-      ref: SourceRef;
-      layer: MemoryLayer;
-      tokens: number;
-      score: number;
-      reason: DropReason;
-      detail?: string;
-    };
+    admitted: false;
+    chunkId: string;
+    ref: SourceRef;
+    layer: MemoryLayer;
+    tokens: number;
+    score: number;
+    reason: DropReason;
+    detail?: string;
+  };
 
 export type LayerStat = { admitted: number; dropped: number; tokens: number };
 

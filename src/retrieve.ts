@@ -86,7 +86,7 @@ export type SearchResult = {
    * record of a decision, it is the record of the decisions made after the
    * interesting one.
    */
-  dropped: Array<{ chunk: Chunk; score: number; detail: string }>;
+  dropped: { chunk: Chunk; score: number; detail: string }[];
 };
 
 export async function search(
