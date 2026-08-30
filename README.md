@@ -81,8 +81,11 @@ worse than no key: it survives review by looking real.
 
 ```bash
 npm install
+npm run lint        # eslint, type-aware
+npm run typecheck   # tsc --noEmit
 npm test            # unit tests
-npm run evals       # the gate: 290 checks, no API key needed
+npm run coverage    # the same tests, with thresholds that fail the build
+npm run evals       # the gate: 315 checks, no API key needed
 npm run measure     # regenerates every number in this README
 
 # The slow scripts print progress to stderr and their document to stdout,
