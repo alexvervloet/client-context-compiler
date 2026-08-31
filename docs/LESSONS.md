@@ -550,3 +550,24 @@ same input and neither is `0`. Check `raw.trim() === ""` alongside `undefined`
 before parsing, not after. And when auditing a group of similar call sites,
 check what each one's bad value actually does downstream before assuming they
 share a severity. Two of these five were already loud.
+
+## A hand-copied eval block drifts the moment a suite is added
+
+**Expected:** the evals section of the README is a transcript of what the runner
+prints, so keeping it accurate is a matter of pasting the output again.
+
+**What happened:** the injection and forgery suite was added, the runner started
+reporting 315 checks, and the quick start was updated to say 315. The transcript
+block six hundred lines away was not, so it listed seven suites summing to 290
+and omitted the suite behind one of the headline claims. Both numbers sat in the
+same file, disagreeing, through several later passes over that file.
+
+Nothing catches this. The suite count is generated, the block is hand-copied,
+and the two only meet in a reader's arithmetic. The prose sentence underneath
+enumerated the keyless suites by name and was wrong in the same way, as was the
+comment in the CI workflow.
+
+**Next time:** a count that appears twice in a document should be generated in
+both places or in neither. Failing that, when a suite is added, grep the repo
+for the old total and for the enumeration by name, because the list of suites
+lives in prose in at least three files that no test reads.
