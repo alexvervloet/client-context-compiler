@@ -179,13 +179,45 @@ Redaction admits 8 passages that strict refuses, which is 0.22% more context.
 
 ## Token estimator error
 
-Not measured on the run that produced the tables above: no Anthropic
-credentials. Comparing the estimator against the real tokenizer needs
-`count_tokens`, so `npm run measure` leaves this section empty without a key.
+Measured over 47 chunks against `count_tokens`.
 
-The measured figures quoted under "Design decisions worth arguing about"
-below (15.6% low before the fix, 2.9% after) come from an earlier run with a
-key, and belong to that run rather than to this one.
+`raw` is the model on its own. `shipped` is what `estimateTokens` returns,
+safety margin included, and is the one that has to stay positive: a window is
+only inside its budget if the ruler overcounts.
+
+| | raw model | shipped |
+| --- | ---: | ---: |
+| mean relative error | -1.7% | 28.3% |
+| worst overcount | 14.7% | 50.0% |
+| worst undercount | -20.5% | 0.0% |
+| share undercounted | 55.3% | 0.0% |
+
+The shipped estimator never undercounted. It overcounts by 28.3% on average,
+which is budget spent on nothing and the price of the guarantee holding.
+
+## Estimator error on a whole window
+
+The per-chunk numbers above are the wrong basis for the safety margin and are
+the reason it is as large as it is. The margin has to cover the worst *chunk*,
+but the budget is a property of the whole *window*, where a few hundred
+chunk-level errors average out. This measures the thing the guarantee is
+actually about.
+
+| client | task | budget | estimated | actual | error |
+| --- | --- | ---: | ---: | ---: | ---: |
+| cl_whitfield_james | meeting-prep | 8000 | 7881 | 6159 | 28.0% |
+| cl_chen_margaret | compliance-review | 8000 | 7942 | 6232 | 27.4% |
+| cl_okonkwo_adaeze | meeting-prep | 16000 | 9693 | 8007 | 21.1% |
+| cl_delgado_robert | daily-briefing | 4000 | 3895 | 3014 | 29.2% |
+
+The overcount averages 26.4%, and the tightest margin in the sample is 21.1%.
+Every window fit inside its budget in real tokens.
+
+That tightest figure is what the margin has to clear, and it says the margin
+could come down to roughly 1.07 and still leave every window here inside its
+budget, recovering most of the wasted space. Four windows is not enough
+evidence to make that change on, so `TOKEN_SAFETY_MARGIN` stays where it is
+until the sample is wider.
 
 ## Reading the numbers
 
@@ -269,14 +301,16 @@ the same rate as letters, in a corpus made of dates and dollar amounts.
 
 Digits are now modelled separately and there is an explicit safety margin
 derived from that measurement rather than chosen. Re-measured, the model runs
-2.9% low on average instead of 15.6%, and the shipped estimator undercounts on
+1.7% low on average instead of 15.6%, and the shipped estimator undercounts on
 0% of samples, which is the property the budget assertion depends on.
 
-It costs 26.8% on average, and most of that waste is a measurement artefact I
-have not finished fixing. The margin has to cover the worst *chunk* (-21.3%),
-but the budget is a property of the whole *window*, where hundreds of chunk
-errors average out. `npm run measure` now reports window-level error too, and
-that is the number the margin should be set from.
+It costs 28.3% on average, and most of that waste is a measurement artefact.
+The margin has to cover the worst *chunk*, which undercounts by 20.5%, but the
+budget is a property of the whole *window*, where hundreds of chunk errors
+average out. Measured over four windows, the overcount is 26.4% and the
+tightest margin is 21.1%, which puts the defensible margin at around 1.07
+rather than the current one. Four windows is not a wide enough sample to change
+it on, and widening that sample is the next thing this file needs.
 
 `makeCompiler({ verifyBudget: true })` checks the finished window against the
 real tokenizer and throws if it does not fit. One network call per compile, off
