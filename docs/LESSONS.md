@@ -571,3 +571,26 @@ comment in the CI workflow.
 both places or in neither. Failing that, when a suite is added, grep the repo
 for the old total and for the enumeration by name, because the list of suites
 lives in prose in at least three files that no test reads.
+
+## Measured numbers pasted into prose outlive the code they measured
+
+**Expected:** `npm run measure` regenerates every number in the README, so
+re-running it after a change is enough to keep the documentation true.
+
+**What happened:** the estimator numbers were quoted in four files. The README's
+generated tables, a paragraph of README prose arguing about the safety margin,
+the walkthrough, and two of the five explanation levels. Only the first of those
+comes out of the script. `b3fc4c8` changed how the envelope is measured, and the
+raw mean moved from -2.9% to -1.7% while the shipped overcount moved from 26.8%
+to 28.3%. Every hand-written copy kept the old pair, including one that used the
+old worst-chunk figure to justify the margin's current value.
+
+The failure is not that the numbers moved. It is that three of the four copies
+had no mechanical link to the thing they described, so nothing could tell they
+were stale, and the drift was only visible by grepping for a percentage.
+
+**Next time:** either the number comes out of the script, or the prose does not
+name a number. "The estimator overcounts by about a fifth" survives a re-measure
+that "-26.8%" does not. Where the exact figure earns its place in an argument,
+grep the whole repository for it after any change to what it measures, because
+the copies are in files the script never opens.
