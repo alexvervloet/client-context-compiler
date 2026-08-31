@@ -177,9 +177,10 @@ const hasKey =
   (process.env["ANTHROPIC_AUTH_TOKEN"] ?? "") !== "";
 
 if (!hasKey) {
-  say("Not measured on this run: no Anthropic credentials. The estimator's");
-  say("accuracy against the real tokenizer is unverified until this is run");
-  say("with a key, and the number below should not be quoted from a mock run.");
+  say("Not measured on this run: no Anthropic credentials. Comparing the");
+  say("estimator against the real tokenizer needs `count_tokens`, so this");
+  say("section stays empty until the script runs with a key. Numbers from an");
+  say("earlier keyed run should be quoted as that run, not as this one.");
 } else {
   const samples = chunks
     .filter((_, i) => i % 17 === 0)

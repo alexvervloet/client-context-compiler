@@ -179,9 +179,13 @@ Redaction admits 8 passages that strict refuses, which is 0.22% more context.
 
 ## Token estimator error
 
-Not measured on this run: no Anthropic credentials. The estimator's
-accuracy against the real tokenizer is unverified until this is run
-with a key, and the number below should not be quoted from a mock run.
+Not measured on the run that produced the tables above: no Anthropic
+credentials. Comparing the estimator against the real tokenizer needs
+`count_tokens`, so `npm run measure` leaves this section empty without a key.
+
+The measured figures quoted under "Design decisions worth arguing about"
+below (15.6% low before the fix, 2.9% after) come from an earlier run with a
+key, and belong to that run rather than to this one.
 
 ## Reading the numbers
 
