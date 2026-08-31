@@ -18,7 +18,7 @@ jobs:
           # let a key committed and reverted last week pass unnoticed.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           # Pinned to the runtime the scripts are written for: type stripping
           # is behind a flag on 22 and on by default from 23.6. Both work, but
