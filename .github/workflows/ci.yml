@@ -52,6 +52,6 @@ jobs:
         run: npm run coverage
 
       # The gate. No API key, so the quality suites report as skipped and the
-      # leak, trap, authorization and budget suites decide the build.
+      # leak, trap, authorization, injection and budget suites decide the build.
       - name: evals
         run: npm run evals

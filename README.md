@@ -454,13 +454,14 @@ PASS  named traps (policy: strict)          (6/6)
 PASS  named traps (policy: redact)          (6/6)
 PASS  authorization                         (13/13)
 PASS  conversation carry-over               (108/108)
+PASS  injection and forgery                 (25/25)
 PASS  budget and manifest                   (61/61)
 SKIP  grounding and attribution
 ```
 
-The leak, trap, authorization, carry-over and budget suites need no model and
-no key. They
-test deterministic code, so they run in CI on every push and gate the merge.
+The leak, trap, authorization, carry-over, injection and budget suites need no
+model and no key. They test deterministic code, so they run in CI on every push
+and gate the merge.
 
 The grounding and attribution suites need a live model and report as **skipped**
 rather than passing quietly against a mock. Passing a quality gate against a
