@@ -298,17 +298,21 @@ const SAFETY_MARGIN = Number(process.env["TOKEN_SAFETY_MARGIN"] ?? 1.3);
 ```
 
 Structural fix alone closed the gap to about 1.17x; clearing the worst observed
--29.5% needs about 1.30x. Re-measured: mean -2.9% raw, and the shipped estimator
+-29.5% needs about 1.30x. Re-measured: mean -1.7% raw, and the shipped estimator
 undercounts on **0%** of samples, which is the property the assertion depends on.
 
 Now the part that is still wrong, and it is a nice methodological error.
 
-The shipped estimator overcounts by **26.8% on average**. The margin was set to
+The shipped estimator overcounts by **28.3% on average**. The margin was set to
 cover the worst *chunk*, but the invariant is a property of the whole *window*,
 across which hundreds of chunk errors average out. Setting a per-window margin
 from per-chunk tail error is a scope mismatch, and it is currently costing about
-a fifth of every window's capacity. `npm run measure` now reports window-level
-error; the margin should be derived from that. Not done.
+a fifth of every window's capacity.
+
+`npm run measure` now reports window-level error: mean 26.4% over four windows,
+tightest 21.1%, which puts the defensible margin near 1.07. A four-window sample
+is not a basis for loosening a safety bound, so widening it is the prerequisite
+and the margin is unchanged. Still open.
 
 There is a correct-by-construction escape hatch for anyone who wants the property
 rather than the belief:

@@ -242,12 +242,15 @@ gap to about 1.17x; clearing the worst observed 29.5% undercount needs about
 1.30x.
 
 Now the honest part, because I do not want to sell this as a clean win. The
-shipped estimator overcounts by **26.8% on average**. That is a fifth of every
+shipped estimator overcounts by **28.3% on average**. That is a fifth of every
 window's capacity thrown away, and most of the waste is a measurement artifact.
 The margin was set to cover the worst *chunk* error, but the budget is a
-property of the whole *window*, where hundreds of chunk errors average out. The
-right margin is derived from window-level error and it is smaller. That fix is
-not done.
+property of the whole *window*, where hundreds of chunk errors average out.
+
+Measured across four whole windows, the overcount is 26.4% and the tightest
+margin is 21.1%, which points at a margin near 1.07 instead of 1.30. Four
+windows is too small a sample to change it on, so the number stands and the
+fix is still open.
 
 There are three lessons stacked here.
 

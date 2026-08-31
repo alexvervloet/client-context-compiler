@@ -521,15 +521,16 @@ more tightly. Every window that reported fitting its budget had been measured
 with the wrong ruler.
 
 Digits are now modelled separately and there is a safety margin of 1.30 that was
-*derived* from the measurement rather than chosen. Re-measured: 2.9% low on
+*derived* from the measurement rather than chosen. Re-measured: 1.7% low on
 average, and undercounting on 0% of samples, which is the property the budget
 assertion actually depends on.
 
 > Watch the cost, and watch that it is admitted. The margin means a window
 > admits roughly a fifth less than it could. Most of that waste is a measurement
 > artefact still not fixed: the margin has to cover the worst *chunk* error
-> (-21.3%), but the budget is a property of the whole *window*, where hundreds
-> of chunk errors average out.
+> (-20.5%), but the budget is a property of the whole *window*, where hundreds
+> of chunk errors average out. Measured over four whole windows the overcount is
+> 26.4%, tightest 21.1%, which would justify a margin nearer 1.07.
 
 `makeCompiler({ verifyBudget: true })` checks the finished window against the
 real tokenizer. One network call per compile, off by default, and the only thing
@@ -698,7 +699,7 @@ and run the evals. The leak suite should fail. If it does not, look at
 `tests/mutation-guards.test.ts`, which exists because it did not.
 
 Set `TOKEN_SAFETY_MARGIN=1.0` and run `npm run evals`. The budget suite should
-start failing, because the estimator is 2.9% low without its margin.
+start failing, because the estimator is 1.7% low without its margin.
 
 Add a turn to a session with the wrong `clientId` and compile. Watch it get
 refused as `other-client-only` even when the turn names nobody.
