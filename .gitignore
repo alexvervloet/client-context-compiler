@@ -4,3 +4,6 @@ dist/
 .DS_Store
 .env
 out/
+
+# Explanation drafts, kept locally rather than shipped.
+docs/education/

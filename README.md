@@ -580,16 +580,6 @@ follow along with the commands as you read.
 Start there if you want to know what the code does. Stay here if you want the
 argument for why it does it that way.
 
-## Explanations, at five levels
-
-The same system explained to five readers, from a high-school Intro to CS
-student up to a senior AI engineer who wants the design review with the sales
-removed. Each one goes as deep as its reader's ceiling allows.
-
-[docs/education/](docs/education/) has the index. Level 4 is written for
-someone interviewing for an AI engineering job without an AI engineering
-background, and the questions in it work regardless of your own depth.
-
 ## Related
 
 Two pieces of this problem I have built before, and deliberately did not rebuild
