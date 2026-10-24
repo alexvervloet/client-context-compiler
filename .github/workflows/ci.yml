@@ -12,7 +12,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # gitleaks scans history, not just the tip. A shallow clone would
           # let a key committed and reverted last week pass unnoticed.
